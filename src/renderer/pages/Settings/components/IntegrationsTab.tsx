@@ -75,7 +75,7 @@ const IntegrationsTab: React.FC<Props> = ({ settings, onUpdate }) => {
       </h3>
 
       {/* Accounting Integration */}
-      <div className="bg-[var(--card-secondary-bg)] border border-[var(--border-color)] rounded-lg p-4">
+      {/* <div className="bg-[var(--card-secondary-bg)] border border-[var(--border-color)] rounded-lg p-4">
         <h4 className="text-md font-medium text-[var(--text-primary)] mb-3 flex items-center gap-2">
           <span className="w-1 h-4 bg-[var(--primary-color)] rounded-full"></span>
           Accounting Integration
@@ -125,7 +125,7 @@ const IntegrationsTab: React.FC<Props> = ({ settings, onUpdate }) => {
             />
           </div>
         </div>
-      </div>
+      </div> */}
 
       {/* Payment Gateway */}
       <div className="bg-[var(--card-secondary-bg)] border border-[var(--border-color)] rounded-lg p-4">

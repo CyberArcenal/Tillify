@@ -93,40 +93,6 @@ const CashierTab: React.FC<Props> = ({ settings, onUpdate }) => {
             Enable Barcode Scanning
           </label>
         </div>
-
-        <div className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            id="enable_touchscreen_mode"
-            checked={settings.enable_touchscreen_mode || false}
-            onChange={(e) =>
-              onUpdate("enable_touchscreen_mode", e.target.checked)
-            }
-            className="windows-checkbox"
-          />
-          <label
-            htmlFor="enable_touchscreen_mode"
-            className="text-sm text-[var(--text-secondary)]"
-          >
-            Enable Touchscreen Mode
-          </label>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            id="quick_sale_enabled"
-            checked={settings.quick_sale_enabled || false}
-            onChange={(e) => onUpdate("quick_sale_enabled", e.target.checked)}
-            className="windows-checkbox"
-          />
-          <label
-            htmlFor="quick_sale_enabled"
-            className="text-sm text-[var(--text-secondary)]"
-          >
-            Enable Quick Sale
-          </label>
-        </div>
       </div>
     </div>
   );

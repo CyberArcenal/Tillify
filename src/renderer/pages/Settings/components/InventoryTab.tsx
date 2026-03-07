@@ -46,24 +46,6 @@ const InventoryTab: React.FC<Props> = ({ settings, onUpdate }) => {
           </label>
         </div>
 
-        <div className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            id="inventory_sync_enabled"
-            checked={settings.inventory_sync_enabled || false}
-            onChange={(e) =>
-              onUpdate("inventory_sync_enabled", e.target.checked)
-            }
-            className="windows-checkbox"
-          />
-          <label
-            htmlFor="inventory_sync_enabled"
-            className="text-sm text-[var(--text-secondary)]"
-          >
-            Enable Inventory Sync
-          </label>
-        </div>
-
         <div>
           <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
             Reorder Level Default

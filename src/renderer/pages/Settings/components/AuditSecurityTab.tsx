@@ -86,58 +86,6 @@ const AuditSecurityTab: React.FC<Props> = ({ settings, onUpdate }) => {
             placeholder="login, logout, create, update, delete"
           />
         </div>
-
-        <div className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            id="force_https"
-            checked={settings.force_https || false}
-            onChange={(e) => onUpdate("force_https", e.target.checked)}
-            className="windows-checkbox"
-          />
-          <label
-            htmlFor="force_https"
-            className="text-sm text-[var(--text-secondary)]"
-          >
-            Force HTTPS
-          </label>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            id="session_encryption_enabled"
-            checked={settings.session_encryption_enabled || false}
-            onChange={(e) =>
-              onUpdate("session_encryption_enabled", e.target.checked)
-            }
-            className="windows-checkbox"
-          />
-          <label
-            htmlFor="session_encryption_enabled"
-            className="text-sm text-[var(--text-secondary)]"
-          >
-            Enable Session Encryption
-          </label>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            id="gdpr_compliance_enabled"
-            checked={settings.gdpr_compliance_enabled || false}
-            onChange={(e) =>
-              onUpdate("gdpr_compliance_enabled", e.target.checked)
-            }
-            className="windows-checkbox"
-          />
-          <label
-            htmlFor="gdpr_compliance_enabled"
-            className="text-sm text-[var(--text-secondary)]"
-          >
-            GDPR Compliance Mode
-          </label>
-        </div>
       </div>
     </div>
   );
