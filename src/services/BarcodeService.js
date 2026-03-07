@@ -2,7 +2,7 @@
 //@ts-check
 const { BrowserWindow, app } = require('electron');
 const { logger } = require('../utils/logger');
-const { AppDataSource } = require('../main/db/datasource');
+
 const Product = require('../entities/Product');
 
 class BarcodeService {
@@ -39,6 +39,7 @@ class BarcodeService {
    * @param {number} intervalMs - Interval in milliseconds (default: 5000)
    */
   startAutoEmit(intervalMs = 5000) {
+    const { AppDataSource } = require('../main/db/datasource');
     if (!this.isDev) return;
     
     this.stopAutoEmit(); // clear any existing interval

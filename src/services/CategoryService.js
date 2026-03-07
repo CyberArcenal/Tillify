@@ -3,8 +3,6 @@
 
 const auditLogger = require("../utils/auditLogger");
 const { validateCategoryData } = require("../utils/categoryUtils");
-// @ts-ignore
-const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
 
 class CategoryService {
   constructor() {
@@ -41,6 +39,8 @@ class CategoryService {
    * @param {string} user - User performing the action
    */
   async create(categoryData, user = "system") {
+    // @ts-ignore
+    const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
     const { category: categoryRepo } = await this.getRepositories();
 
     try {
@@ -53,8 +53,10 @@ class CategoryService {
       const {
         // @ts-ignore
         name,
+
         // @ts-ignore
         description = null,
+
         // @ts-ignore
         isActive = true,
       } = categoryData;
@@ -62,6 +64,7 @@ class CategoryService {
       console.log(`Creating category: Name ${name}`);
 
       // Check name uniqueness
+
       // @ts-ignore
       const existing = await categoryRepo.findOne({ where: { name } });
       if (existing) {
@@ -69,6 +72,7 @@ class CategoryService {
       }
 
       // Create category entity
+
       // @ts-ignore
       const category = categoryRepo.create({
         name,
@@ -105,6 +109,8 @@ class CategoryService {
    * @param {string} user - User performing the action
    */
   async update(id, categoryData, user = "system") {
+    // @ts-ignore
+    const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
     const { category: categoryRepo } = await this.getRepositories();
 
     try {
@@ -117,6 +123,7 @@ class CategoryService {
       const oldData = { ...existingCategory };
 
       // If name is being changed, check uniqueness
+
       // @ts-ignore
       if (categoryData.name && categoryData.name !== existingCategory.name) {
         // @ts-ignore
@@ -156,6 +163,8 @@ class CategoryService {
    * @param {string} user - User performing the action
    */
   async delete(id, user = "system") {
+    // @ts-ignore
+    const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
     const { category: categoryRepo } = await this.getRepositories();
 
     try {
@@ -200,6 +209,7 @@ class CategoryService {
       if (!category) {
         throw new Error(`Category with ID ${id} not found`);
       }
+
       // @ts-ignore
       await auditLogger.logView("Category", id, "system");
       return category;
@@ -222,6 +232,7 @@ class CategoryService {
       const queryBuilder = categoryRepo.createQueryBuilder("category");
 
       // Filter by active status
+
       // @ts-ignore
       if (options.isActive !== undefined) {
         queryBuilder.andWhere("category.isActive = :isActive", {
@@ -231,6 +242,7 @@ class CategoryService {
       }
 
       // Search by name
+
       // @ts-ignore
       if (options.search) {
         queryBuilder.andWhere("category.name LIKE :search", {
@@ -240,17 +252,21 @@ class CategoryService {
       }
 
       // Sorting
+
       // @ts-ignore
       const sortBy = options.sortBy || "createdAt";
+
       // @ts-ignore
       const sortOrder = options.sortOrder === "ASC" ? "ASC" : "DESC";
       queryBuilder.orderBy(`category.${sortBy}`, sortOrder);
 
       // Pagination
+
       // @ts-ignore
       if (options.page && options.limit) {
         // @ts-ignore
         const offset = (options.page - 1) * options.limit;
+
         // @ts-ignore
         queryBuilder.skip(offset).take(options.limit);
       }
@@ -269,22 +285,27 @@ class CategoryService {
    * Get category statistics
    */
   async getStatistics() {
-    const { category: categoryRepo, product: productRepo } = await this.getRepositories();
+    // @ts-ignore
+    const { category: categoryRepo, product: productRepo } =
+      await this.getRepositories();
 
     try {
       // Total active categories
+
       // @ts-ignore
       const totalActive = await categoryRepo.count({
         where: { isActive: true },
       });
 
       // Total inactive categories
+
       // @ts-ignore
       const totalInactive = await categoryRepo.count({
         where: { isActive: false },
       });
 
       // Categories with product counts
+
       // @ts-ignore
       const categoriesWithProductCount = await categoryRepo
         .createQueryBuilder("category")
@@ -320,18 +341,13 @@ class CategoryService {
 
       let exportData;
       if (format === "csv") {
-        const headers = [
-          "ID",
-          "Name",
-          "Description",
-          "Active",
-          "Created At",
-        ];
+        const headers = ["ID", "Name", "Description", "Active", "Created At"];
         const rows = categories.map((c) => [
           c.id,
           c.name,
           c.description || "",
           c.isActive ? "Yes" : "No",
+
           // @ts-ignore
           new Date(c.createdAt).toLocaleDateString(),
         ]);
@@ -350,7 +366,9 @@ class CategoryService {
 
       // @ts-ignore
       await auditLogger.logExport("Category", format, filters, user);
-      console.log(`Exported ${categories.length} categories in ${format} format`);
+      console.log(
+        `Exported ${categories.length} categories in ${format} format`,
+      );
       return exportData;
     } catch (error) {
       console.error("Failed to export categories:", error);

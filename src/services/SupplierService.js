@@ -3,7 +3,7 @@
 
 const auditLogger = require("../utils/auditLogger");
 // @ts-ignore
-const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
+
 const { validateSupplierData } = require("../utils/supplierUtils");
 
 class SupplierService {
@@ -41,6 +41,7 @@ class SupplierService {
    * @param {string} user - User performing the action
    */
   async create(supplierData, user = "system") {
+    const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
     const { supplier: supplierRepo } = await this.getRepositories();
 
     try {
@@ -114,6 +115,7 @@ class SupplierService {
    * @param {string} user - User performing the action
    */
   async update(id, supplierData, user = "system") {
+    const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
     const { supplier: supplierRepo } = await this.getRepositories();
 
     try {
@@ -165,6 +167,7 @@ class SupplierService {
    * @param {string} user - User performing the action
    */
   async delete(id, user = "system") {
+    const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
     const { supplier: supplierRepo } = await this.getRepositories();
 
     try {

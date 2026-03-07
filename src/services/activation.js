@@ -5,7 +5,7 @@ const LicenseCache = require("../entities/LicenseCache");
 const crypto = require("crypto");
 const os = require("os");
 const { activationClient } = require("../utils/activationClient");
-const { AppDataSource } = require("../main/db/datasource");
+
 
 // DeviceInfo class moved here
 class DeviceInfo {
@@ -95,6 +95,7 @@ class LicenseService {
   }
 
   async getRepository() {
+    const { AppDataSource } = require("../main/db/datasource");
     if (!AppDataSource.isInitialized) {
       await AppDataSource.initialize();
     }

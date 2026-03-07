@@ -2,9 +2,7 @@
 //@ts-check
 
 const auditLogger = require("../utils/auditLogger");
-// @ts-ignore
-// @ts-ignore
-const { saveDb, updateDb, removeDb } = require("../utils/dbUtils/dbActions");
+
 const { validateProductData } = require("../utils/productUtils");
 
 class ProductService {
@@ -43,6 +41,8 @@ class ProductService {
    * @param {string} user - User performing the action
    */
   async create(productData, user = "system") {
+    // @ts-ignore
+    const { saveDb, updateDb, removeDb } = require("../utils/dbUtils/dbActions");
     const { product: productRepo } = await this.getRepositories();
 
     // Kunin ang category at supplier repositories kung kailangan mong i-validate ang existence
@@ -62,25 +62,34 @@ class ProductService {
       const {
         // @ts-ignore
         sku = generateSKU("PRD"),
+
         // @ts-ignore
         name,
+
         // @ts-ignore
         price,
+
         // @ts-ignore
         stockQty = 0,
+
         // @ts-ignore
         description = null,
+
         // @ts-ignore
         isActive = true,
+
         // @ts-ignore
         categoryId,
+
         // @ts-ignore
         supplierId,
+
         // @ts-ignore
         barcode,
       } = productData;
 
       // Check SKU uniqueness
+
       // @ts-ignore
       const existing = await productRepo.findOne({ where: { sku } });
       if (existing) {
@@ -88,7 +97,9 @@ class ProductService {
       }
 
       // @ts-ignore
-      const existing_barcode = await productRepo.findOne({ where: { barcode } });
+      const existing_barcode = await productRepo.findOne({
+        where: { barcode },
+      });
       if (existing_barcode) {
         throw new Error(`Product with barcode "${barcode}" already exists`);
       }
@@ -109,6 +120,7 @@ class ProductService {
       }
 
       // Create product entity
+
       // @ts-ignore
       const product = productRepo.create({
         sku,
@@ -146,6 +158,8 @@ class ProductService {
    * @param {string} user - User performing the action
    */
   async update(id, productData, user = "system") {
+    // @ts-ignore
+    const { saveDb, updateDb, removeDb } = require("../utils/dbUtils/dbActions");
     const { product: productRepo } = await this.getRepositories();
 
     const { AppDataSource } = require("../main/db/datasource");
@@ -164,6 +178,7 @@ class ProductService {
       const oldData = { ...existingProduct };
 
       // Handle SKU uniqueness (existing code)
+
       // @ts-ignore
       if (productData.sku && productData.sku !== existingProduct.sku) {
         // @ts-ignore
@@ -179,6 +194,7 @@ class ProductService {
       }
 
       // Handle category update
+
       // @ts-ignore
       if (productData.categoryId !== undefined) {
         // @ts-ignore
@@ -195,14 +211,17 @@ class ProductService {
               // @ts-ignore
               `Category with ID ${productData.categoryId} not found`,
             );
+
           // @ts-ignore
           existingProduct.category = category;
         }
+
         // @ts-ignore
         delete productData.categoryId; // para hindi ma-assign bilang direct property
       }
 
       // Handle supplier update
+
       // @ts-ignore
       if (productData.supplierId !== undefined) {
         // @ts-ignore
@@ -219,9 +238,11 @@ class ProductService {
               // @ts-ignore
               `Supplier with ID ${productData.supplierId} not found`,
             );
+
           // @ts-ignore
           existingProduct.supplier = supplier;
         }
+
         // @ts-ignore
         delete productData.supplierId;
       }
@@ -247,6 +268,8 @@ class ProductService {
    * @param {string} user - User performing the action
    */
   async delete(id, user = "system") {
+    // @ts-ignore
+    const { saveDb, updateDb, removeDb } = require("../utils/dbUtils/dbActions");
     const { product: productRepo } = await this.getRepositories();
 
     try {
@@ -291,6 +314,7 @@ class ProductService {
       if (!product) {
         throw new Error(`Product with ID ${id} not found`);
       }
+
       // @ts-ignore
       await auditLogger.logView("Product", id, "system");
       return product;
@@ -316,6 +340,7 @@ class ProductService {
         .leftJoinAndSelect("product.supplier", "supplier"); // kung gusto mong i-include ang supplier
 
       // Filter by active status
+
       // @ts-ignore
       if (options.isActive !== undefined) {
         queryBuilder.andWhere("product.isActive = :isActive", {
@@ -325,6 +350,7 @@ class ProductService {
       }
 
       // Filter by categoryId
+
       // @ts-ignore
       if (options.categoryId) {
         queryBuilder.andWhere("category.id = :categoryId", {
@@ -334,6 +360,7 @@ class ProductService {
       }
 
       // Filter by supplierId
+
       // @ts-ignore
       if (options.supplierId) {
         queryBuilder.andWhere("supplier.id = :supplierId", {
@@ -343,16 +370,19 @@ class ProductService {
       }
 
       // Search by name or SKU
+
       // @ts-ignore
       if (options.search) {
         queryBuilder.andWhere(
           "(product.name LIKE :search OR product.sku LIKE :search OR product.barcode LIKE :search)",
+
           // @ts-ignore
           { search: `%${options.search}%` },
         );
       }
 
       // Price range filters
+
       // @ts-ignore
       if (options.minPrice !== undefined) {
         queryBuilder.andWhere("product.price >= :minPrice", {
@@ -360,6 +390,7 @@ class ProductService {
           minPrice: options.minPrice,
         });
       }
+
       // @ts-ignore
       if (options.maxPrice !== undefined) {
         queryBuilder.andWhere("product.price <= :maxPrice", {
@@ -369,17 +400,21 @@ class ProductService {
       }
 
       // Sorting
+
       // @ts-ignore
       const sortBy = options.sortBy || "createdAt";
+
       // @ts-ignore
       const sortOrder = options.sortOrder === "ASC" ? "ASC" : "DESC";
       queryBuilder.orderBy(`product.${sortBy}`, sortOrder);
 
       // Pagination
+
       // @ts-ignore
       if (options.page && options.limit) {
         // @ts-ignore
         const offset = (options.page - 1) * options.limit;
+
         // @ts-ignore
         queryBuilder.skip(offset).take(options.limit);
       }
@@ -406,11 +441,14 @@ class ProductService {
     productId,
     quantityChange,
     movementType,
+
     // @ts-ignore
     notes = null,
     user = "system",
     saleId = null,
   ) {
+    // @ts-ignore
+    const { saveDb, updateDb, removeDb } = require("../utils/dbUtils/dbActions");
     const { product: productRepo, inventoryMovement: movementRepo } =
       await this.getRepositories();
 
@@ -422,6 +460,7 @@ class ProductService {
       }
 
       const oldStock = product.stockQty;
+
       // @ts-ignore
       const newStock = oldStock + quantityChange;
       if (newStock < 0) {
@@ -433,10 +472,12 @@ class ProductService {
       // Update product stock
       product.stockQty = newStock;
       product.updatedAt = new Date();
+
       // @ts-ignore
       const savedProduct = await updateDb(productRepo, product);
 
       // Create inventory movement record
+
       // @ts-ignore
       const movement = movementRepo.create({
         movementType,
@@ -446,6 +487,7 @@ class ProductService {
         sale: saleId ? { id: saleId } : null,
         timestamp: new Date(),
       });
+
       // @ts-ignore
       await saveDb(movementRepo, movement);
 
@@ -505,18 +547,21 @@ class ProductService {
 
     try {
       // Total active products
+
       // @ts-ignore
       const totalActive = await productRepo.count({
         where: { isActive: true },
       });
 
       // Total inactive products
+
       // @ts-ignore
       const totalInactive = await productRepo.count({
         where: { isActive: false },
       });
 
       // Total stock value (active products)
+
       // @ts-ignore
       const stockValueResult = await productRepo
         .createQueryBuilder("product")
@@ -526,6 +571,7 @@ class ProductService {
       const totalStockValue = parseFloat(stockValueResult.totalValue) || 0;
 
       // Average product price (active)
+
       // @ts-ignore
       const avgPriceResult = await productRepo
         .createQueryBuilder("product")
@@ -535,6 +581,7 @@ class ProductService {
       const averagePrice = parseFloat(avgPriceResult.averagePrice) || 0;
 
       // Count of products with zero stock
+
       // @ts-ignore
       const zeroStock = await productRepo.count({
         where: { isActive: true, stockQty: 0 },
@@ -583,6 +630,7 @@ class ProductService {
           p.price,
           p.stockQty,
           p.isActive ? "Yes" : "No",
+
           // @ts-ignore
           new Date(p.createdAt).toLocaleDateString(),
         ]);
@@ -610,13 +658,13 @@ class ProductService {
   }
 }
 
-
 function generateSKU(prefix = "PRD") {
   const timestamp = Date.now().toString(36); // base36 para mas maikli
-  const random = Math.floor(Math.random() * 999).toString().padStart(3, "0");
+  const random = Math.floor(Math.random() * 999)
+    .toString()
+    .padStart(3, "0");
   return `${prefix}-${timestamp}-${random}`;
 }
-
 
 // Singleton instance
 const productService = new ProductService();

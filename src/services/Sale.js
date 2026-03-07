@@ -2,7 +2,7 @@
 //@ts-check
 
 const auditLogger = require("../utils/auditLogger");
-const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
+
 const { validateSaleData, calculateSaleTotals } = require("../utils/saleUtils");
 // 🔧 SETTINGS INTEGRATION: import all needed settings getters
 const {
@@ -72,6 +72,7 @@ class SaleService {
    * @param {string} user - User performing the action
    */
   async create(saleData, user = "system") {
+    const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
     const {
       sale: saleRepo,
       saleItem: saleItemRepo,
@@ -263,6 +264,7 @@ class SaleService {
    * @param {string} user
    */
   async markAsPaid(id, user = "system") {
+    const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
     const { sale: saleRepo } = await this.getRepositories();
 
     try {
@@ -299,6 +301,7 @@ class SaleService {
    * @param {string} user
    */
   async voidSale(id, reason, user = "system") {
+    const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
     const { sale: saleRepo } = await this.getRepositories();
 
     try {
@@ -342,6 +345,7 @@ class SaleService {
    */
   // @ts-ignore
   async refundSale(id, itemsToRefund, reason, user = "system") {
+    const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
     const { sale: saleRepo } = await this.getRepositories();
 
     try {

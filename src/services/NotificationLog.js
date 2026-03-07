@@ -1,9 +1,9 @@
 // src/services/notificationLog.service.js
 // @ts-check
-const { AppDataSource } = require("../main/db/datasource");
 const NotificationLog = require("../entities/NotificationLog");
 const emailSender = require("../channels/email.sender");
 const { logger } = require("../utils/logger");
+
 
 const LOG_STATUS = {
   QUEUED: "queued",
@@ -39,6 +39,7 @@ class NotificationLogService {
    * @param {typeof logger} [deps.logger] - Logger instance
    */
   constructor(deps = {}) {
+    const { AppDataSource } = require("../main/db/datasource");
     // @ts-ignore
     this.repository = deps.repository || AppDataSource.getRepository(NotificationLog);
     this.emailSender = deps.emailSender || emailSender;

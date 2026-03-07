@@ -3,7 +3,6 @@
 
 const auditLogger = require("../utils/auditLogger");
 const { validateCustomerData } = require("../utils/customerUtils");
-const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
 
 class CustomerService {
   constructor() {
@@ -45,6 +44,8 @@ class CustomerService {
    * @param {string} user - User performing the action
    */
   async create(customerData, user = "system") {
+    // @ts-ignore
+    const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
     const { customer: customerRepo } = await this.getRepositories();
 
     try {
@@ -57,8 +58,10 @@ class CustomerService {
       const {
         // @ts-ignore
         name,
+
         // @ts-ignore
         contactInfo = null,
+
         // @ts-ignore
         loyaltyPointsBalance = 0,
       } = customerData;
@@ -66,6 +69,7 @@ class CustomerService {
       console.log(`Creating customer: ${name}`);
 
       // Create customer entity
+
       // @ts-ignore
       const customer = customerRepo.create({
         name,
@@ -102,6 +106,8 @@ class CustomerService {
    * @param {string} user - User performing the action
    */
   async update(id, customerData, user = "system") {
+    // @ts-ignore
+    const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
     const { customer: customerRepo } = await this.getRepositories();
 
     try {
@@ -150,6 +156,7 @@ class CustomerService {
       if (!customer) {
         throw new Error(`Customer with ID ${id} not found`);
       }
+
       // @ts-ignore
       await auditLogger.logView("Customer", id, "system");
       return customer;
@@ -172,16 +179,19 @@ class CustomerService {
       const queryBuilder = customerRepo.createQueryBuilder("customer");
 
       // Search by name or contact info
+
       // @ts-ignore
       if (options.search) {
         queryBuilder.andWhere(
           "(customer.name LIKE :search OR customer.contactInfo LIKE :search)",
+
           // @ts-ignore
           { search: `%${options.search}%` },
         );
       }
 
       // Filter by loyalty points range
+
       // @ts-ignore
       if (options.minPoints !== undefined) {
         queryBuilder.andWhere("customer.loyaltyPointsBalance >= :minPoints", {
@@ -189,6 +199,7 @@ class CustomerService {
           minPoints: options.minPoints,
         });
       }
+
       // @ts-ignore
       if (options.maxPoints !== undefined) {
         queryBuilder.andWhere("customer.loyaltyPointsBalance <= :maxPoints", {
@@ -198,17 +209,21 @@ class CustomerService {
       }
 
       // Sorting
+
       // @ts-ignore
       const sortBy = options.sortBy || "createdAt";
+
       // @ts-ignore
       const sortOrder = options.sortOrder === "ASC" ? "ASC" : "DESC";
       queryBuilder.orderBy(`customer.${sortBy}`, sortOrder);
 
       // Pagination
+
       // @ts-ignore
       if (options.page && options.limit) {
         // @ts-ignore
         const offset = (options.page - 1) * options.limit;
+
         // @ts-ignore
         queryBuilder.skip(offset).take(options.limit);
       }
@@ -234,6 +249,7 @@ class CustomerService {
   async addLoyaltyPoints(
     customerId,
     points,
+
     // @ts-ignore
     notes = null,
     saleId = null,
@@ -254,6 +270,7 @@ class CustomerService {
   async redeemLoyaltyPoints(
     customerId,
     points,
+
     // @ts-ignore
     notes = null,
     saleId = null,
@@ -267,8 +284,10 @@ class CustomerService {
    * Internal method to adjust loyalty points
    * @private
    */
+
   // @ts-ignore
   async _adjustLoyaltyPoints(customerId, pointsChange, notes, saleId, user) {
+    const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
     const { customer: customerRepo, loyaltyTransaction: loyaltyRepo } =
       await this.getRepositories();
 
@@ -298,6 +317,7 @@ class CustomerService {
       const updatedCustomer = await updateDb(customerRepo, customer);
 
       // Create loyalty transaction
+
       // @ts-ignore
       const transaction = loyaltyRepo.create({
         pointsChange,
@@ -306,6 +326,7 @@ class CustomerService {
         sale: saleId ? { id: saleId } : null,
         timestamp: new Date(),
       });
+
       // @ts-ignore
       await saveDb(loyaltyRepo, transaction);
 
@@ -350,17 +371,21 @@ class CustomerService {
         .where("tx.customerId = :customerId", { customerId });
 
       // Sorting
+
       // @ts-ignore
       const sortBy = options.sortBy || "timestamp";
+
       // @ts-ignore
       const sortOrder = options.sortOrder === "ASC" ? "ASC" : "DESC";
       queryBuilder.orderBy(`tx.${sortBy}`, sortOrder);
 
       // Pagination
+
       // @ts-ignore
       if (options.page && options.limit) {
         // @ts-ignore
         const offset = (options.page - 1) * options.limit;
+
         // @ts-ignore
         queryBuilder.skip(offset).take(options.limit);
       }
@@ -382,10 +407,12 @@ class CustomerService {
 
     try {
       // Total customers
+
       // @ts-ignore
       const totalCustomers = await customerRepo.count();
 
       // Customers with loyalty points
+
       // @ts-ignore
       const withPoints = await customerRepo
         .createQueryBuilder("customer")
@@ -393,6 +420,7 @@ class CustomerService {
         .getCount();
 
       // Average loyalty points
+
       // @ts-ignore
       const avgPointsResult = await customerRepo
         .createQueryBuilder("customer")
@@ -401,6 +429,7 @@ class CustomerService {
       const averagePoints = parseFloat(avgPointsResult.average) || 0;
 
       // Top 5 customers by points
+
       // @ts-ignore
       const topCustomers = await customerRepo
         .createQueryBuilder("customer")
@@ -409,6 +438,7 @@ class CustomerService {
         .getMany();
 
       // Customers with sales (distinct)
+
       // @ts-ignore
       const customersWithSales = await saleRepo
         .createQueryBuilder("sale")
@@ -460,8 +490,10 @@ class CustomerService {
           c.name,
           c.contactInfo || "",
           c.loyaltyPointsBalance,
+
           // @ts-ignore
           new Date(c.createdAt).toLocaleDateString(),
+
           // @ts-ignore
           c.updatedAt ? new Date(c.updatedAt).toLocaleDateString() : "",
         ]);

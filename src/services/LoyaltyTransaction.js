@@ -2,7 +2,7 @@
 //@ts-check
 
 const auditLogger = require("../utils/auditLogger");
-const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
+
 const { validateLoyaltyTransaction } = require("../utils/loyaltyUtils");
 
 class LoyaltyTransactionService {
@@ -49,6 +49,7 @@ class LoyaltyTransactionService {
    * @param {string} user - User performing the action
    */
   async createManual(data, user = "system") {
+    const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
     const {
       transaction: txRepo,
       customer: customerRepo,
@@ -65,6 +66,7 @@ class LoyaltyTransactionService {
       const { customerId, pointsChange, notes, saleId } = data;
 
       // Fetch customer
+
       // @ts-ignore
       const customer = await customerRepo.findOne({
         where: { id: customerId },
@@ -98,13 +100,16 @@ class LoyaltyTransactionService {
       const oldBalance = customer.loyaltyPointsBalance;
 
       // Update customer balance
+
       // @ts-ignore
       customer.loyaltyPointsBalance += pointsChange;
       customer.updatedAt = new Date();
+
       // @ts-ignore
       const updatedCustomer = await updateDb(customerRepo, customer);
 
       // Create transaction record
+
       // @ts-ignore
       const transaction = txRepo.create({
         pointsChange,
@@ -113,6 +118,7 @@ class LoyaltyTransactionService {
         sale: sale || null,
         timestamp: new Date(),
       });
+
       // @ts-ignore
       const savedTx = await saveDb(txRepo, transaction);
 
@@ -138,6 +144,7 @@ class LoyaltyTransactionService {
     } catch (error) {
       console.error(
         "Failed to create manual loyalty transaction:",
+
         // @ts-ignore
         error.message,
       );
@@ -161,6 +168,7 @@ class LoyaltyTransactionService {
       if (!transaction) {
         throw new Error(`Loyalty transaction with ID ${id} not found`);
       }
+
       // @ts-ignore
       await auditLogger.logView("LoyaltyTransaction", id, "system");
       return transaction;
@@ -186,6 +194,7 @@ class LoyaltyTransactionService {
         .leftJoinAndSelect("tx.sale", "sale");
 
       // Filter by customer
+
       // @ts-ignore
       if (options.customerId) {
         queryBuilder.andWhere("tx.customerId = :customerId", {
@@ -195,6 +204,7 @@ class LoyaltyTransactionService {
       }
 
       // Filter by sale
+
       // @ts-ignore
       if (options.saleId) {
         queryBuilder.andWhere("tx.saleId = :saleId", {
@@ -204,6 +214,7 @@ class LoyaltyTransactionService {
       }
 
       // Filter by date range
+
       // @ts-ignore
       if (options.startDate) {
         queryBuilder.andWhere("tx.timestamp >= :startDate", {
@@ -211,6 +222,7 @@ class LoyaltyTransactionService {
           startDate: options.startDate,
         });
       }
+
       // @ts-ignore
       if (options.endDate) {
         queryBuilder.andWhere("tx.timestamp <= :endDate", {
@@ -220,6 +232,7 @@ class LoyaltyTransactionService {
       }
 
       // Filter by points direction (earn/redeem)
+
       // @ts-ignore
       if (options.type === "earn") {
         queryBuilder.andWhere("tx.pointsChange > 0");
@@ -229,6 +242,7 @@ class LoyaltyTransactionService {
       }
 
       // Search in notes
+
       // @ts-ignore
       if (options.search) {
         queryBuilder.andWhere("tx.notes LIKE :search", {
@@ -238,17 +252,21 @@ class LoyaltyTransactionService {
       }
 
       // Sorting
+
       // @ts-ignore
       const sortBy = options.sortBy || "timestamp";
+
       // @ts-ignore
       const sortOrder = options.sortOrder === "ASC" ? "ASC" : "DESC";
       queryBuilder.orderBy(`tx.${sortBy}`, sortOrder);
 
       // Pagination
+
       // @ts-ignore
       if (options.page && options.limit) {
         // @ts-ignore
         const offset = (options.page - 1) * options.limit;
+
         // @ts-ignore
         queryBuilder.skip(offset).take(options.limit);
       }
@@ -271,6 +289,7 @@ class LoyaltyTransactionService {
 
     try {
       // Total points earned (sum of positive changes)
+
       // @ts-ignore
       const earnedResult = await txRepo
         .createQueryBuilder("tx")
@@ -280,6 +299,7 @@ class LoyaltyTransactionService {
       const totalEarned = parseFloat(earnedResult.total) || 0;
 
       // Total points redeemed (sum of absolute negative changes)
+
       // @ts-ignore
       const redeemedResult = await txRepo
         .createQueryBuilder("tx")
@@ -289,16 +309,19 @@ class LoyaltyTransactionService {
       const totalRedeemed = parseFloat(redeemedResult.total) || 0;
 
       // Count of transactions by type
+
       // @ts-ignore
       const earnCount = await txRepo.count({
         where: { pointsChange: { $gt: 0 } },
       }); // typeorm syntax may differ; using query builder
+
       // @ts-ignore
       const redeemCount = await txRepo.count({
         where: { pointsChange: { $lt: 0 } },
       });
 
       // Most active customers (by transaction count)
+
       // @ts-ignore
       const topCustomers = await txRepo
         .createQueryBuilder("tx")
@@ -311,6 +334,7 @@ class LoyaltyTransactionService {
         .getRawMany();
 
       // Transactions per month (last 6 months)
+
       // @ts-ignore
       const monthly = await txRepo
         .createQueryBuilder("tx")
@@ -365,11 +389,14 @@ class LoyaltyTransactionService {
         ];
         const rows = transactions.map((tx) => [
           tx.id,
+
           // @ts-ignore
           tx.customer?.name || "N/A",
+
           // @ts-ignore
           tx.sale?.id || "",
           tx.pointsChange,
+
           // @ts-ignore
           tx.pointsChange > 0
             ? "Earn"
@@ -378,6 +405,7 @@ class LoyaltyTransactionService {
               ? "Redeem"
               : "Zero",
           tx.notes || "",
+
           // @ts-ignore
           new Date(tx.timestamp).toLocaleString(),
         ]);

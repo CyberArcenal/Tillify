@@ -3,7 +3,7 @@
 
 const auditLogger = require("../utils/auditLogger");
 // @ts-ignore
-const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
+
 const { validateReturnData } = require("../utils/returnUtils");
 
 class ReturnRefundService {
@@ -58,6 +58,7 @@ class ReturnRefundService {
    * @param {string} user - User performing the action
    */
   async create(returnData, user = "system") {
+    const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
     const {
       return: returnRepo,
       sale: saleRepo,
@@ -192,6 +193,7 @@ class ReturnRefundService {
    * @param {string} user - User performing the action
    */
   async update(id, returnData, user = "system") {
+    const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
     const {
       return: returnRepo,
       sale: saleRepo,
@@ -396,6 +398,7 @@ class ReturnRefundService {
    * @param {string} user - User performing the action
    */
   async delete(id, user = "system") {
+    const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
     const { return: returnRepo } = await this.getRepositories();
 
     try {

@@ -2,7 +2,7 @@
 //@ts-check
 
 const auditLogger = require("../utils/auditLogger");
-const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
+
 const { validateInventoryMovement } = require("../utils/inventoryUtils");
 
 class InventoryMovementService {
@@ -50,6 +50,7 @@ class InventoryMovementService {
    * @param {string} user - User performing the action
    */
   async createAdjustment(data, user = "system") {
+    const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
     const {
       movement: movementRepo,
       product: productRepo,
@@ -66,6 +67,7 @@ class InventoryMovementService {
       const { productId, qtyChange, movementType, notes, saleId } = data;
 
       // Fetch product
+
       // @ts-ignore
       const product = await productRepo.findOne({ where: { id: productId } });
       if (!product) {
@@ -73,6 +75,7 @@ class InventoryMovementService {
       }
 
       // Check stock sufficiency if decreasing
+
       // @ts-ignore
       if (qtyChange < 0 && product.stockQty + qtyChange < 0) {
         throw new Error(
@@ -94,13 +97,16 @@ class InventoryMovementService {
       const oldStock = product.stockQty;
 
       // Update product stock
+
       // @ts-ignore
       product.stockQty += qtyChange;
       product.updatedAt = new Date();
+
       // @ts-ignore
       const updatedProduct = await updateDb(productRepo, product);
 
       // Create movement record
+
       // @ts-ignore
       const movement = movementRepo.create({
         movementType,
@@ -110,6 +116,7 @@ class InventoryMovementService {
         sale: sale || null,
         timestamp: new Date(),
       });
+
       // @ts-ignore
       const savedMovement = await saveDb(movementRepo, movement);
 
@@ -155,6 +162,7 @@ class InventoryMovementService {
       if (!movement) {
         throw new Error(`Inventory movement with ID ${id} not found`);
       }
+
       // @ts-ignore
       await auditLogger.logView("InventoryMovement", id, "system");
       return movement;
@@ -180,6 +188,7 @@ class InventoryMovementService {
         .leftJoinAndSelect("movement.sale", "sale");
 
       // Filter by product
+
       // @ts-ignore
       if (options.productId) {
         queryBuilder.andWhere("movement.productId = :productId", {
@@ -189,6 +198,7 @@ class InventoryMovementService {
       }
 
       // Filter by sale
+
       // @ts-ignore
       if (options.saleId) {
         queryBuilder.andWhere("movement.saleId = :saleId", {
@@ -198,6 +208,7 @@ class InventoryMovementService {
       }
 
       // Filter by movement type
+
       // @ts-ignore
       if (options.movementType) {
         queryBuilder.andWhere("movement.movementType = :movementType", {
@@ -205,6 +216,7 @@ class InventoryMovementService {
           movementType: options.movementType,
         });
       }
+
       // @ts-ignore
       if (options.movementTypes && options.movementTypes.length) {
         queryBuilder.andWhere("movement.movementType IN (:...movementTypes)", {
@@ -214,6 +226,7 @@ class InventoryMovementService {
       }
 
       // Filter by date range
+
       // @ts-ignore
       if (options.startDate) {
         queryBuilder.andWhere("movement.timestamp >= :startDate", {
@@ -221,6 +234,7 @@ class InventoryMovementService {
           startDate: options.startDate,
         });
       }
+
       // @ts-ignore
       if (options.endDate) {
         queryBuilder.andWhere("movement.timestamp <= :endDate", {
@@ -230,6 +244,7 @@ class InventoryMovementService {
       }
 
       // Filter by direction (increase/decrease)
+
       // @ts-ignore
       if (options.direction === "increase") {
         queryBuilder.andWhere("movement.qtyChange > 0");
@@ -239,6 +254,7 @@ class InventoryMovementService {
       }
 
       // Search in notes
+
       // @ts-ignore
       if (options.search) {
         queryBuilder.andWhere("movement.notes LIKE :search", {
@@ -248,17 +264,21 @@ class InventoryMovementService {
       }
 
       // Sorting
+
       // @ts-ignore
       const sortBy = options.sortBy || "timestamp";
+
       // @ts-ignore
       const sortOrder = options.sortOrder === "ASC" ? "ASC" : "DESC";
       queryBuilder.orderBy(`movement.${sortBy}`, sortOrder);
 
       // Pagination
+
       // @ts-ignore
       if (options.page && options.limit) {
         // @ts-ignore
         const offset = (options.page - 1) * options.limit;
+
         // @ts-ignore
         queryBuilder.skip(offset).take(options.limit);
       }
@@ -281,6 +301,7 @@ class InventoryMovementService {
 
     try {
       // Total quantity changes by type
+
       // @ts-ignore
       const byType = await movementRepo
         .createQueryBuilder("movement")
@@ -291,12 +312,14 @@ class InventoryMovementService {
         .getRawMany();
 
       // Total increases and decreases
+
       // @ts-ignore
       const totalIncrease = await movementRepo
         .createQueryBuilder("movement")
         .select("SUM(movement.qtyChange)", "total")
         .where("movement.qtyChange > 0")
         .getRawOne();
+
       // @ts-ignore
       const totalDecrease = await movementRepo
         .createQueryBuilder("movement")
@@ -305,6 +328,7 @@ class InventoryMovementService {
         .getRawOne();
 
       // Movements per product (top 5)
+
       // @ts-ignore
       const topProducts = await movementRepo
         .createQueryBuilder("movement")
@@ -317,6 +341,7 @@ class InventoryMovementService {
         .getRawMany();
 
       // Monthly trends
+
       // @ts-ignore
       const monthly = await movementRepo
         .createQueryBuilder("movement")
@@ -371,17 +396,22 @@ class InventoryMovementService {
         ];
         const rows = movements.map((m) => [
           m.id,
+
           // @ts-ignore
           m.product?.name || "N/A",
+
           // @ts-ignore
           m.product?.sku || "N/A",
           m.movementType,
           m.qtyChange,
+
           // @ts-ignore
           m.qtyChange > 0 ? "Increase" : m.qtyChange < 0 ? "Decrease" : "Zero",
+
           // @ts-ignore
           m.sale?.id || "",
           m.notes || "",
+
           // @ts-ignore
           new Date(m.timestamp).toLocaleString(),
         ]);

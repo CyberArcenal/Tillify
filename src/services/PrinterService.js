@@ -1,7 +1,6 @@
 // src/services/PrinterService.js
 //@ts-check
 const auditLogger = require("../utils/auditLogger");
-const { AppDataSource } = require("../main/db/datasource");
 const Sale = require("../entities/Sale");
 const {
   companyName,
@@ -11,7 +10,6 @@ const {
 } = require("../utils/system");
 
 const { logger } = require("../utils/logger");
-
 class PrinterService {
   constructor() {
     this.driver = null;
@@ -57,6 +55,7 @@ class PrinterService {
    * @returns {Promise<boolean>}
    */
   async printReceipt(saleId) {
+    const { AppDataSource } = require("../main/db/datasource");
     const notificationService = require("./NotificationService");
     let driver;
     try {

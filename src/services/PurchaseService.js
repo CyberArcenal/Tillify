@@ -2,14 +2,15 @@
 // @ts-check
 
 const auditLogger = require("../utils/auditLogger");
-// @ts-ignore
-const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
+
 const { validatePurchaseData } = require("../utils/purchaseUtils");
 
 // 🔧 SETTINGS INTEGRATION: import needed settings getters
 const {
   // Notification settings (for future use, but we don't implement notifications)
+  // @ts-ignore
   emailEnabled,
+  // @ts-ignore
   smsEnabled,
   getNotifySupplierOnConfirmedWithEmail,
   getNotifySupplierOnConfirmedWithSms,
@@ -67,6 +68,8 @@ class PurchaseService {
    * @param {string} user - User performing the action
    */
   async create(purchaseData, user = "system") {
+    // @ts-ignore
+    const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
     const {
       purchase: purchaseRepo,
       supplier: supplierRepo,
@@ -83,14 +86,19 @@ class PurchaseService {
       const {
         // @ts-ignore
         referenceNo,
+
         // @ts-ignore
         supplierId,
+
         // @ts-ignore
         orderDate = new Date(),
+
         // @ts-ignore
         status = "pending",
+
         // @ts-ignore
         items = [],
+
         // @ts-ignore
         notes,
       } = purchaseData;
@@ -98,6 +106,7 @@ class PurchaseService {
       console.log(`Creating purchase: Reference ${referenceNo}`);
 
       // Check supplier exists
+
       // @ts-ignore
       const supplier = await supplierRepo.findOne({
         where: { id: supplierId },
@@ -142,6 +151,7 @@ class PurchaseService {
       }
 
       // Create purchase entity
+
       // @ts-ignore
       const purchase = purchaseRepo.create({
         referenceNo: referenceNo || generateReferenceNumber(),
@@ -155,6 +165,7 @@ class PurchaseService {
       });
 
       // Save purchase (cascade will save items)
+
       // @ts-ignore
       const savedPurchase = await saveDb(purchaseRepo, purchase);
 
@@ -193,6 +204,8 @@ class PurchaseService {
    * @param {string} user - User performing the action
    */
   async update(id, purchaseData, user = "system") {
+    // @ts-ignore
+    const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
     const {
       purchase: purchaseRepo,
       supplier: supplierRepo,
@@ -238,6 +251,7 @@ class PurchaseService {
             `Supplier with ID ${purchaseData.supplierId} not found`,
           );
         }
+
         // @ts-ignore
         existingPurchase.supplier = supplier;
       }
@@ -260,11 +274,13 @@ class PurchaseService {
             `Purchase with reference "${purchaseData.referenceNo}" already exists`,
           );
         }
+
         // @ts-ignore
         existingPurchase.referenceNo = purchaseData.referenceNo;
       }
 
       // Handle items update if provided (only allowed for pending purchases)
+
       // @ts-ignore
       if (purchaseData.items) {
         if (existingPurchase.status !== "pending") {
@@ -272,6 +288,7 @@ class PurchaseService {
         }
 
         // Validate new items
+
         // @ts-ignore
         const validation = validatePurchaseData({ items: purchaseData.items });
         if (!validation.valid) {
@@ -291,6 +308,7 @@ class PurchaseService {
 
         const newItems = [];
         let totalAmount = 0;
+
         // @ts-ignore
         for (const item of purchaseData.items) {
           // @ts-ignore
@@ -312,22 +330,26 @@ class PurchaseService {
             subtotal,
           });
         }
+
         // @ts-ignore
         existingPurchase.purchaseItems = newItems;
         existingPurchase.totalAmount = totalAmount;
       }
 
       // Update other fields
+
       // @ts-ignore
       if (purchaseData.orderDate)
         // @ts-ignore
         existingPurchase.orderDate = purchaseData.orderDate;
+
       // @ts-ignore
       if (purchaseData.notes !== undefined)
         // @ts-ignore
         existingPurchase.notes = purchaseData.notes;
 
       // Handle status change
+
       // @ts-ignore
       const newStatus = purchaseData.status;
       if (newStatus && newStatus !== oldStatus) {
@@ -371,6 +393,7 @@ class PurchaseService {
       existingPurchase.updatedAt = new Date();
 
       // Save updated purchase
+
       // @ts-ignore
       const savedPurchase = await updateDb(purchaseRepo, existingPurchase);
 
@@ -392,6 +415,8 @@ class PurchaseService {
    * @param {string} user - User performing the action
    */
   async delete(id, user = "system") {
+    // @ts-ignore
+    const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
     const { purchase: purchaseRepo } = await this.getRepositories();
 
     try {
@@ -442,6 +467,7 @@ class PurchaseService {
       if (!purchase) {
         throw new Error(`Purchase with ID ${id} not found`);
       }
+
       // @ts-ignore
       await auditLogger.logView("Purchase", id, "system");
       return purchase;
@@ -468,6 +494,7 @@ class PurchaseService {
         .leftJoinAndSelect("purchaseItems.product", "product");
 
       // Filter by status
+
       // @ts-ignore
       if (options.status) {
         queryBuilder.andWhere("purchase.status = :status", {
@@ -477,6 +504,7 @@ class PurchaseService {
       }
 
       // Filter by supplier
+
       // @ts-ignore
       if (options.supplierId) {
         queryBuilder.andWhere("supplier.id = :supplierId", {
@@ -486,6 +514,7 @@ class PurchaseService {
       }
 
       // Date range
+
       // @ts-ignore
       if (options.startDate) {
         queryBuilder.andWhere("purchase.orderDate >= :startDate", {
@@ -493,6 +522,7 @@ class PurchaseService {
           startDate: options.startDate,
         });
       }
+
       // @ts-ignore
       if (options.endDate) {
         queryBuilder.andWhere("purchase.orderDate <= :endDate", {
@@ -502,6 +532,7 @@ class PurchaseService {
       }
 
       // Search by reference
+
       // @ts-ignore
       if (options.search) {
         queryBuilder.andWhere("purchase.referenceNo LIKE :search", {
@@ -511,17 +542,21 @@ class PurchaseService {
       }
 
       // Sorting
+
       // @ts-ignore
       const sortBy = options.sortBy || "orderDate";
+
       // @ts-ignore
       const sortOrder = options.sortOrder === "ASC" ? "ASC" : "DESC";
       queryBuilder.orderBy(`purchase.${sortBy}`, sortOrder);
 
       // Pagination
+
       // @ts-ignore
       if (options.page && options.limit) {
         // @ts-ignore
         const offset = (options.page - 1) * options.limit;
+
         // @ts-ignore
         queryBuilder.skip(offset).take(options.limit);
       }
@@ -544,6 +579,7 @@ class PurchaseService {
 
     try {
       // Count by status
+
       // @ts-ignore
       const statusCounts = await purchaseRepo
         .createQueryBuilder("purchase")
@@ -553,6 +589,7 @@ class PurchaseService {
         .getRawMany();
 
       // Total purchase amount for completed purchases
+
       // @ts-ignore
       const totalCompleted = await purchaseRepo
         .createQueryBuilder("purchase")
@@ -561,6 +598,7 @@ class PurchaseService {
         .getRawOne();
 
       // Average purchase amount
+
       // @ts-ignore
       const avgAmount = await purchaseRepo
         .createQueryBuilder("purchase")
@@ -569,6 +607,7 @@ class PurchaseService {
         .getRawOne();
 
       // Purchase count by supplier (top 5)
+
       // @ts-ignore
       const topSuppliers = await purchaseRepo
         .createQueryBuilder("purchase")
@@ -620,14 +659,18 @@ class PurchaseService {
         const rows = purchases.map((p) => [
           p.id,
           p.referenceNo || "",
+
           // @ts-ignore
           p.supplier?.name || "",
+
           // @ts-ignore
           new Date(p.orderDate).toLocaleDateString(),
           p.status,
           p.totalAmount,
+
           // @ts-ignore
           p.notes || "",
+
           // @ts-ignore
           new Date(p.createdAt).toLocaleDateString(),
         ]);
