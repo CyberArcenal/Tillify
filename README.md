@@ -2,6 +2,25 @@
 
 A modern, feature‑rich Point of Sale (POS) management system built with **Electron, React, TypeScript, and SQLite**. This desktop application provides tools for retail operations, inventory tracking, sales processing, and customer relationship management.
 
+## Why Tillify?
+
+Tillify is an **all-in-one POS system** designed for any business type:
+
+- 🛒 Grocery and retail shops  
+- 🍽 Restaurants and cafés  
+- 🔥 Gasul and supply stores  
+- 🛠 Service-based businesses  
+
+With **offline-first design**, **customer loyalty**, **vouchers**, and **auto-update support**, Tillify adapts to your workflow — no matter the industry.
+
+### Touchscreen-Friendly Cashier
+
+- Large **grid-based item layout** for quick tap selection  
+- Built-in **search bar** for fast lookup of products  
+- Optimized for **Windows touchscreen devices** (Surface, 2-in-1 laptops, tablets)  
+- Works seamlessly with **mouse + keyboard** or **touch input**  
+- Designed to be **hardware-optional** — fully functional even without barcode scanners or receipt printers
+
 ## 📸 Screenshots
 
 Here are sample displays of the system
@@ -27,7 +46,6 @@ Here are sample displays of the system
 - **Automated Backups**: Backup and recovery system
 - **Migrations**: Automated schema management
 - **Reporting & Analytics**: Sales, inventory, customer insights, charts
-- **User Management**: Role‑based access and activity tracking
 
 ## 🛠 Tech Stack
 
@@ -44,7 +62,6 @@ Here are sample displays of the system
 
 **Key Libraries**
 
-- Bcryptjs (password hashing)
 - Decimal.js (precise financial calculations)
 - Lucide React (icons)
 - Reflect Metadata (TypeORM support)
@@ -131,7 +148,6 @@ Outputs packaged app in `release/`.
 
 ## 🔒 Security
 
-- Bcrypt password hashing
 - Audit logging
 - SQLite encryption options
 - Input validation
