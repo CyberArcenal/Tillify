@@ -515,6 +515,7 @@ async function createMainWindow() {
     mainWindow.on("close", (event) => {
       log(LogLevel.INFO, "❌ Main window close event triggered", {
         isShuttingDown,
+        // @ts-ignore
         fromIPC: event.sender === mainWindow.webContents ? "renderer" : "other",
       });
       if (!APP_CONFIG.isDev && !isShuttingDown) {
