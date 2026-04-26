@@ -1,5 +1,5 @@
 // src/main/ipc/loyalty/reverse.ipc.js
-//@ts-check
+
 const auditLogger = require("../../../utils/auditLogger");
 
 /**

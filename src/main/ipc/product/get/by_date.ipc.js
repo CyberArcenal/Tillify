@@ -1,5 +1,5 @@
 // src/main/ipc/product/get/by_date.ipc
-//@ts-check
+
 const { Between } = require("typeorm");
 const { AppDataSource } = require("../../../db/datasource");
 const Product = require("../../../../entities/Product");

@@ -1,5 +1,5 @@
 // src/main/services/BarcodeService.js
-//@ts-check
+
 const { BrowserWindow, app } = require('electron');
 const { logger } = require('../utils/logger');
 

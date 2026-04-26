@@ -39,7 +39,7 @@ const DEFAULT_SALES: SalesSettings = {
   allow_refunds: true,
   refund_window_days: 7,
   loyalty_points_enabled: false,
-  loyalty_points_rate: 1,
+  loyalty_points_rate: 100,
 };
 
 const DEFAULT_CASHIER: CashierSettings = {

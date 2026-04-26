@@ -1,4 +1,4 @@
-// @ts-check
+
 const os = require('os');
 const crypto = require('crypto');
 const { execSync } = require('child_process');

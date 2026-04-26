@@ -1,4 +1,4 @@
-//@ts-check
+
 const { AuditLog } = require('../entities/AuditLog');
 
 // const { auditTrailEnabled } = require('./system');

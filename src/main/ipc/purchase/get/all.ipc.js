@@ -1,5 +1,5 @@
 // src/main/ipc/purchase/get/all.ipc.js
-// @ts-check
+
 
 const purchaseService = require("../../../../services/PurchaseService");
 

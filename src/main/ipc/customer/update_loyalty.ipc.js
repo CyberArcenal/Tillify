@@ -1,5 +1,3 @@
-//@ts-check
-
 const customerService = require("../../../services/Customer");
 
 /**
@@ -8,18 +6,13 @@ const customerService = require("../../../services/Customer");
  * @param {number} params.id - Customer ID
  * @param {number} params.points - New points balance
  * @param {string} [params.notes] - Reason for change
- * @param {string} [params.userId] - User performing action
- * @param {import("typeorm").QueryRunner} [queryRunner] - Transaction runner
+ * @param {string} [params.user] - User performing action
+ * @param {import("typeorm").QueryRunner} queryRunner - Transaction runner
  * @returns {Promise<{status: boolean, message: string, data: any}>}
  */
 module.exports = async (params, queryRunner) => {
   try {
-    const {
-      id,
-      points,
-      notes = "Manual adjustment",
-      userId = "system",
-    } = params;
+    const { id, points, notes = "Manual adjustment", user = "system" } = params;
 
     if (!id || isNaN(id)) {
       throw new Error("Valid customer ID is required");
@@ -28,8 +21,14 @@ module.exports = async (params, queryRunner) => {
       throw new Error("Points value is required");
     }
 
-    // Get current customer to compute delta
-    const customer = await customerService.findById(Number(id));
+    // Get current customer (use queryRunner for consistency)
+    const Customer = require("../../../entities/Customer");
+    const repo = queryRunner.manager.getRepository(Customer);
+    const customer = await repo.findOne({ where: { id: Number(id) } });
+    if (!customer) {
+      throw new Error(`Customer with ID ${id} not found`);
+    }
+
     const currentPoints = customer.loyaltyPointsBalance;
     const delta = Number(points) - currentPoints;
 
@@ -41,7 +40,6 @@ module.exports = async (params, queryRunner) => {
       };
     }
 
-    // Use add/redeem methods to ensure transaction logging
     let result;
     if (delta > 0) {
       result = await customerService.addLoyaltyPoints(
@@ -49,7 +47,8 @@ module.exports = async (params, queryRunner) => {
         delta,
         notes,
         null,
-        userId,
+        user,
+        queryRunner
       );
     } else {
       result = await customerService.redeemLoyaltyPoints(
@@ -57,7 +56,8 @@ module.exports = async (params, queryRunner) => {
         -delta,
         notes,
         null,
-        userId,
+        user,
+        queryRunner
       );
     }
 

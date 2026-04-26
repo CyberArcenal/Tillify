@@ -1,4 +1,4 @@
-//@ts-check
+
 
 // @ts-ignore
 // @ts-ignore

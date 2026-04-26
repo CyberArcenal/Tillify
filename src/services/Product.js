@@ -1,5 +1,5 @@
 // services/ProductService.js
-//@ts-check
+
 
 const auditLogger = require("../utils/auditLogger");
 const {

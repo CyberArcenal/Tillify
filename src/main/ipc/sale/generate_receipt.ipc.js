@@ -1,4 +1,5 @@
-//@ts-check
+
+
 const saleService = require("../../../services/Sale");
 
 /**
@@ -12,7 +13,7 @@ module.exports = async (params, queryRunner) => {
     if (!id) return { status: false, message: "id is required", data: null };
 
     console.log("[IPC] sale:generate_receipt called", { id });
-    const receipt = await saleService.generateReceipt(id);
+    const receipt = await saleService.generateReceipt(id, queryRunner);
     return {
       status: true,
       message: "Receipt generated",
@@ -22,7 +23,6 @@ module.exports = async (params, queryRunner) => {
     console.error("[IPC] sale:generate_receipt error:", error);
     return {
       status: false,
-      // @ts-ignore
       message: error.message || "Failed to generate receipt",
       data: null,
     };

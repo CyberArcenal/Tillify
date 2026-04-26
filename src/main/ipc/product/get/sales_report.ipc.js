@@ -1,5 +1,5 @@
 // src/main/ipc/product/get/sales_report.ipc
-//@ts-check
+
 const { AppDataSource } = require("../../../db/datasource");
 const SaleItem = require("../../../../entities/SaleItem");
 

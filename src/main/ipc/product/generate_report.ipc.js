@@ -1,5 +1,5 @@
 // // src/main/ipc/product/generate_report.ipc
-// //@ts-check
+// 
 // src/main/ipc/product/generate_report.ipc
 const fs = require("fs").promises;
 const path = require("path");

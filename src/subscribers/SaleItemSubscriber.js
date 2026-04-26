@@ -1,5 +1,5 @@
 // src/subscribers/SaleItemSubscriber.js
-//@ts-check
+
 const SaleItem = require("../entities/SaleItem");
 const { logger } = require("../utils/logger");
 

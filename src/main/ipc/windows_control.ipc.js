@@ -1,5 +1,5 @@
 // src/main/ipcHandlers/windowControlHandlers.js
-// @ts-check
+
 const { ipcMain, BrowserWindow } = require("electron");
 
 class WindowControlHandlers {

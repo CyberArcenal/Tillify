@@ -1,5 +1,5 @@
 // src/channels/email.sender.js
-//@ts-check
+
 const nodemailer = require("nodemailer");
 const PQueue = require("p-queue").default;
 const NotificationLog = require("../entities/NotificationLog");

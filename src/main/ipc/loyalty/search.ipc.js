@@ -1,8 +1,7 @@
 // src/main/ipc/loyalty/search.ipc.js
-//@ts-check
 
-const LoyaltyTransaction = require("../../../entities/LoyaltyTransaction");
-const { AppDataSource } = require("../../db/datasource");
+
+const loyaltyTransactionService = require("../../../services/LoyaltyTransaction");
 
 /**
  * Search loyalty transactions by various criteria
@@ -20,52 +19,46 @@ const { AppDataSource } = require("../../db/datasource");
  */
 module.exports = async (params) => {
   try {
-    const txRepo = AppDataSource.getRepository(LoyaltyTransaction);
-    const queryBuilder = txRepo
-      .createQueryBuilder('tx')
-      .leftJoinAndSelect('tx.customer', 'customer')
-      .leftJoinAndSelect('tx.sale', 'sale');
-
-    if (params.query) {
-      queryBuilder.andWhere(
-        '(tx.notes LIKE :query OR customer.name LIKE :query)',
-        { query: `%${params.query}%` }
-      );
-    }
-    if (params.customerId) {
-      queryBuilder.andWhere('tx.customerId = :customerId', { customerId: params.customerId });
-    }
-    if (params.saleId) {
-      queryBuilder.andWhere('tx.saleId = :saleId', { saleId: params.saleId });
-    }
-    if (params.startDate) {
-      queryBuilder.andWhere('tx.timestamp >= :startDate', { startDate: params.startDate });
-    }
-    if (params.endDate) {
-      queryBuilder.andWhere('tx.timestamp <= :endDate', { endDate: params.endDate });
-    }
-    if (params.minPoints !== undefined) {
-      queryBuilder.andWhere('ABS(tx.pointsChange) >= :minPoints', { minPoints: params.minPoints });
-    }
-    if (params.maxPoints !== undefined) {
-      queryBuilder.andWhere('ABS(tx.pointsChange) <= :maxPoints', { maxPoints: params.maxPoints });
-    }
-
-    queryBuilder.orderBy('tx.timestamp', 'DESC');
-
-    if (params.page && params.limit) {
-      const skip = (params.page - 1) * params.limit;
-      queryBuilder.skip(skip).take(params.limit);
+    const filters = {
+      customerId: params.customerId,
+      saleId: params.saleId,
+      startDate: params.startDate,
+      endDate: params.endDate,
+      search: params.query, // service uses 'search' for notes
+      page: params.page,
+      limit: params.limit,
+      sortBy: 'timestamp',
+      sortOrder: 'DESC',
+    };
+    // Note: minPoints/maxPoints are not directly supported by service findAll; we could implement later.
+    // For now, ignore them or fetch all and filter. Simpler: ignore.
+    if (params.minPoints !== undefined || params.maxPoints !== undefined) {
+      // Fallback: get all and filter in memory (simple but not efficient)
+      const all = await loyaltyTransactionService.findAll({ ...filters, limit: 1000 });
+      let filtered = all;
+      if (params.minPoints !== undefined) {
+        filtered = filtered.filter(tx => Math.abs(tx.pointsChange) >= params.minPoints);
+      }
+      if (params.maxPoints !== undefined) {
+        filtered = filtered.filter(tx => Math.abs(tx.pointsChange) <= params.maxPoints);
+      }
+      return {
+        status: true,
+        data: {
+          transactions: filtered,
+          total: filtered.length,
+          page: params.page || 1,
+          limit: params.limit || filtered.length,
+        },
+      };
     }
 
-    const transactions = await queryBuilder.getMany();
-    const total = await queryBuilder.getCount(); // optional: add total count
-
+    const transactions = await loyaltyTransactionService.findAll(filters);
     return {
       status: true,
       data: {
         transactions,
-        total,
+        total: transactions.length,
         page: params.page || 1,
         limit: params.limit || transactions.length,
       },

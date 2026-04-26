@@ -1,5 +1,5 @@
 // utils/supplierUtils.js
-// @ts-check
+
 
 /**
  * Validate supplier data

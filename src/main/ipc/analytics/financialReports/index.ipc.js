@@ -1,6 +1,6 @@
 // src/main/ipc/financialReports/index.ipc.js
 // Financial Reports Handler (Read-Only)
-//@ts-check
+
 const { ipcMain } = require("electron");
 const { logger } = require("../../../../utils/logger");
 // @ts-ignore

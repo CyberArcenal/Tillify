@@ -1,5 +1,5 @@
 // src/services/PrinterService.js
-//@ts-check
+
 const auditLogger = require("../utils/auditLogger");
 const Sale = require("../entities/Sale");
 const {
@@ -100,10 +100,10 @@ class PrinterService {
             userId: 1,
             title: "Printer Error",
             // @ts-ignore
-            message: `Failed to print receipt: ${error.message}`,
+            message: `Failed to print receipt: ${err.message}`,
             type: "error",
             // @ts-ignore
-            metadata: { error: error.message },
+            metadata: { error: err.message },
           },
           "system",
         );

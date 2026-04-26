@@ -1,5 +1,5 @@
 // // src/main/ipc/product/update_stock.ipc
-// //@ts-check
+// 
 
 // src/main/ipc/product/update_stock.ipc
 const productService = require("../../../services/Product");

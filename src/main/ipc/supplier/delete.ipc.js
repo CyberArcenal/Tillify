@@ -1,7 +1,6 @@
 // src/main/ipc/supplier/delete.ipc
-// @ts-check
+
 const { logger } = require("../../../utils/logger");
-const auditLogger = require("../../../utils/auditLogger");
 const supplierService = require("../../../services/SupplierService");
 
 /**
@@ -14,17 +13,20 @@ const supplierService = require("../../../services/SupplierService");
  */
 module.exports = async (params, queryRunner) => {
   try {
-    const updated = await supplierService.delete(params.id);
+    const { id, user = "system" } = params;
+    if (!id || isNaN(Number(id))) {
+      throw new Error("Valid supplier ID is required");
+    }
+    const updated = await supplierService.delete(Number(id), user, queryRunner);
     return {
       status: true,
+      message: "Supplier deactivated successfully",
       data: updated,
     };
   } catch (error) {
-    // @ts-ignore
     logger?.error("deleteSupplier error:", error);
     return {
       status: false,
-      // @ts-ignore
       message: error.message || "Failed to delete supplier",
       data: null,
     };

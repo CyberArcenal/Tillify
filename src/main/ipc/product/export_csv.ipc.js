@@ -1,5 +1,5 @@
 // // src/main/ipc/product/export_csv.ipc
-// //@ts-check
+// 
 // src/main/ipc/product/export_csv.ipc
 const fs = require("fs").promises;
 const path = require("path");

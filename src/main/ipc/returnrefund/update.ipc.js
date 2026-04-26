@@ -1,4 +1,4 @@
-// @ts-check
+
 const returnRefundService = require("../../../services/ReturnRefundService");
 
 /**
@@ -7,7 +7,7 @@ const returnRefundService = require("../../../services/ReturnRefundService");
  * @param {number} params.id - Return ID.
  * @param {Object} params.updates - Fields to update (referenceNo, saleId, customerId, reason, refundMethod, status, items).
  * @param {string} [user='system'] - Username.
- * @param {import('typeorm').QueryRunner} [queryRunner] - Transaction runner.
+ * @param {import('typeorm').QueryRunner} queryRunner - Transaction runner.
  * @returns {Promise<{status: boolean, message: string, data: any}>}
  */
 module.exports = async (params, queryRunner) => {
@@ -20,7 +20,7 @@ module.exports = async (params, queryRunner) => {
       throw new Error("Updates object is required");
     }
 
-    const updated = await returnRefundService.update(id, updates, user);
+    const updated = await returnRefundService.update(id, updates, user, queryRunner);
     return {
       status: true,
       message: "Return updated successfully",

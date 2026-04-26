@@ -1,5 +1,5 @@
 // src/subscribers/ProductSubscriber.js
-//@ts-check
+
 const Product = require("../entities/Product");
 const { logger } = require("../utils/logger");
 

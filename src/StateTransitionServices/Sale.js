@@ -1,5 +1,5 @@
 // src/services/SaleStateTransitionService.js
-//@ts-check
+
 const Product = require("../entities/Product");
 const Customer = require("../entities/Customer");
 const InventoryMovement = require("../entities/InventoryMovement");

@@ -1,4 +1,4 @@
-// @ts-check
+
 const returnRefundService = require("../../../services/ReturnRefundService");
 
 /**
@@ -12,13 +12,12 @@ const returnRefundService = require("../../../services/ReturnRefundService");
  * @param {string} [params.status='pending'] - Initial status.
  * @param {Array<{productId: number, quantity: number, unitPrice: number, reason?: string}>} params.items - Returned items.
  * @param {string} [user='system'] - Username performing action (can be passed in params).
- * @param {import('typeorm').QueryRunner} [queryRunner] - Transaction runner.
+ * @param {import('typeorm').QueryRunner} queryRunner - Transaction runner.
  * @returns {Promise<{status: boolean, message: string, data: any}>}
  */
 module.exports = async (params, queryRunner) => {
   try {
     const { user = "system", ...returnData } = params;
-    // Basic validation
     if (
       !returnData.referenceNo ||
       !returnData.saleId ||
@@ -32,9 +31,7 @@ module.exports = async (params, queryRunner) => {
       );
     }
 
-    // If queryRunner is provided, we could pass a transactional entity manager to the service.
-    // For now, we call the service directly (service does not use queryRunner yet).
-    const created = await returnRefundService.create(returnData, user);
+    const created = await returnRefundService.create(returnData, user, queryRunner);
     return {
       status: true,
       message: "Return created successfully",

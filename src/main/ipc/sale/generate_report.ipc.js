@@ -1,4 +1,5 @@
-//@ts-check
+
+
 const saleService = require("../../../services/Sale");
 
 /**
@@ -18,10 +19,10 @@ module.exports = async (params, queryRunner) => {
     let reportData;
     switch (reportType) {
       case "summary":
-        reportData = await saleService.getStatistics();
+        reportData = await saleService.getStatistics(queryRunner);
         break;
       case "detailed":
-        reportData = await saleService.findAll(filters);
+        reportData = await saleService.findAll(filters, queryRunner);
         break;
       case "payment_methods": {
         const saleRepo = queryRunner.manager.getRepository("Sale");

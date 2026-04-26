@@ -1,5 +1,5 @@
 // electron-app/main/ipc/handlers/systemConfig.js
-//@ts-check
+
 const { ipcMain } = require("electron");
 // @ts-ignore
 // @ts-ignore

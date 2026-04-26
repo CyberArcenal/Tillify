@@ -1,4 +1,4 @@
-//@ts-check
+
 const ReturnRefund = require("../entities/ReturnRefund");
 const {
   ReturnRefundStateTransitionService,

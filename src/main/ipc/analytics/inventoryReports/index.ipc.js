@@ -1,6 +1,6 @@
 // src/main/ipc/inventoryReports/index.ipc.js
 // Inventory Reports Handler (Read-Only)
-//@ts-check
+
 const { ipcMain } = require("electron");
 const { logger } = require("../../../../utils/logger");
 const Product = require("../../../../entities/Product");

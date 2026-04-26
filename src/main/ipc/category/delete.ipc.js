@@ -1,5 +1,5 @@
-// @ts-check
-const { AuditLog } = require("../../../entities/AuditLog");
+
+const categoryService = require("../../../services/CategoryService");
 
 /**
  * Soft delete a category (set isActive = false) (transactional)
@@ -20,34 +20,11 @@ module.exports = async (params, queryRunner) => {
       throw new Error("Invalid or missing category ID");
     }
 
-    const categoryRepo = queryRunner.manager.getRepository("Category");
-
-    // Find existing
-    const category = await categoryRepo.findOne({ where: { id: Number(id) } });
-    if (!category) {
-      throw new Error(`Category with ID ${id} not found`);
-    }
-
-    if (!category.isActive) {
-      throw new Error(`Category #${id} is already inactive`);
-    }
-
-    // Soft delete
-    category.isActive = false;
-    category.updatedAt = new Date();
-    const savedCategory = await categoryRepo.save(category);
-
-    // Audit log
-    const auditRepo = queryRunner.manager.getRepository(AuditLog);
-    const audit = auditRepo.create({
-      action: "DELETE",
-      entity: "Category",
-      entityId: savedCategory.id,
+    const savedCategory = await categoryService.delete(
+      Number(id),
       user,
-      timestamp: new Date(),
-      description: `Category deactivated: ${savedCategory.name}`,
-    });
-    await auditRepo.save(audit);
+      queryRunner
+    );
 
     return {
       status: true,

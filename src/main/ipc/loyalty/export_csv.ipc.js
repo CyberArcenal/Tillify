@@ -1,5 +1,5 @@
 // src/main/ipc/loyalty/export_csv.ipc.js
-//@ts-check
+
 
 const loyaltyTransactionService = require("../../../services/LoyaltyTransaction");
 

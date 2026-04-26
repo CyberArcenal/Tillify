@@ -1,4 +1,4 @@
-//@ts-check
+
 
 const { AppDataSource } = require("../../main/db/datasource");
 

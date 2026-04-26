@@ -1,5 +1,3 @@
-
-
 const customerService = require("../../../services/Customer");
 
 /**
@@ -8,8 +6,9 @@ const customerService = require("../../../services/Customer");
  * @param {string} params.name - Customer name
  * @param {string} [params.contactInfo] - Contact info
  * @param {number} [params.loyaltyPointsBalance] - Initial loyalty points
- * @param {string} [params.userId] - User performing action
- * @param {import("typeorm").QueryRunner} [queryRunner] - Transaction runner (unused here, service handles its own)
+ * @param {boolean} [params.isActive] - Active status (default true)
+ * @param {string} [params.user] - User performing action
+ * @param {import("typeorm").QueryRunner} queryRunner - Transaction runner
  * @returns {Promise<{status: boolean, message: string, data: any}>}
  */
 module.exports = async (params, queryRunner) => {
@@ -18,7 +17,8 @@ module.exports = async (params, queryRunner) => {
       name,
       contactInfo,
       loyaltyPointsBalance,
-      userId = "system",
+      isActive = true,
+      user = "system",
     } = params;
 
     if (!name || typeof name !== "string") {
@@ -28,11 +28,11 @@ module.exports = async (params, queryRunner) => {
     const customerData = {
       name,
       contactInfo,
-      loyaltyPointsBalance:
-        loyaltyPointsBalance !== undefined ? Number(loyaltyPointsBalance) : 0,
+      loyaltyPointsBalance: loyaltyPointsBalance !== undefined ? Number(loyaltyPointsBalance) : 0,
+      isActive,
     };
 
-    const newCustomer = await customerService.create(customerData, userId);
+    const newCustomer = await customerService.create(customerData, user, queryRunner);
     return {
       status: true,
       message: "Customer created successfully",

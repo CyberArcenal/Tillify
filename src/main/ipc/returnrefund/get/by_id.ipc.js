@@ -1,11 +1,11 @@
-// @ts-check
+
 const returnRefundService = require("../../../../services/ReturnRefundService");
 
 /**
  * Get a single return by its ID.
  * @param {Object} params - Request parameters.
  * @param {number} params.id - Return ID.
- * @param {import('typeorm').QueryRunner} [queryRunner] - Optional transaction runner.
+ * @param {import('typeorm').QueryRunner} queryRunner - Transaction runner (optional for reads).
  * @returns {Promise<{status: boolean, message: string, data: any}>}
  */
 module.exports = async (params, queryRunner) => {
@@ -15,7 +15,7 @@ module.exports = async (params, queryRunner) => {
       throw new Error("Valid return ID is required");
     }
 
-    const returnRefund = await returnRefundService.findById(id);
+    const returnRefund = await returnRefundService.findById(id, queryRunner);
     return {
       status: true,
       message: "Return fetched successfully",

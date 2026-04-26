@@ -1,4 +1,4 @@
-// @ts-check
+
 
 const categoryService = require("../../../services/CategoryService");
 
@@ -21,7 +21,7 @@ module.exports = async (params = {}) => {
     const exportData = await categoryService.exportCategories(
       format,
       filters,
-      user,
+      user
     );
 
     return {

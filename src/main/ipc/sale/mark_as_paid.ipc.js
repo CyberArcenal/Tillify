@@ -1,4 +1,5 @@
-//@ts-check
+
+
 const saleService = require("../../../services/Sale");
 
 /**
@@ -9,11 +10,11 @@ const saleService = require("../../../services/Sale");
  */
 module.exports = async (params, queryRunner) => {
   try {
-    const { id, user } = params;
+    const { id, user = "system" } = params;
     if (!id) return { status: false, message: "id is required", data: null };
 
     console.log("[IPC] sale:mark_as_paid called", { id });
-    const result = await saleService.markAsPaid(id, user || "system");
+    const result = await saleService.markAsPaid(id, user, queryRunner);
     return {
       status: true,
       message: "Sale marked as paid",

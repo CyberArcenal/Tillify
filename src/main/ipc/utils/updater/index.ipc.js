@@ -1,5 +1,5 @@
 // src/main/ipc/updater/index.ipc.js
-//@ts-check
+
 const { ipcMain } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const { logger } = require('../../../../utils/logger');

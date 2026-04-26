@@ -1,6 +1,6 @@
 // src/main/ipc/returnRefund/index.ipc.js
 // Return & Refund Report Handler (Read-Only)
-//@ts-check
+
 const { ipcMain } = require("electron");
 const { AppDataSource } = require("../../../db/datasource");
 // @ts-ignore

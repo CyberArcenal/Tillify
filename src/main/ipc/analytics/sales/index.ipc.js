@@ -1,6 +1,6 @@
 // src/main/ipc/sales/index.ipc.js
 // Sales Reports Handler (Read-Only)
-//@ts-check
+
 const { ipcMain } = require("electron");
 const { logger } = require("../../../../utils/logger");
 const { AppDataSource } = require("../../../db/datasource");

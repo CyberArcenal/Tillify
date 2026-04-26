@@ -1,5 +1,5 @@
 // src/main/ipc/purchase/delete.ipc.js
-// @ts-check
+
 
 const purchaseService = require('../../../services/PurchaseService');
 
@@ -23,7 +23,7 @@ module.exports = async (params, queryRunner) => {
       };
     }
 
-    const deletedPurchase = await purchaseService.delete(id, user);
+    const deletedPurchase = await purchaseService.delete(id, user, queryRunner);
     return {
       status: true,
       message: "Purchase cancelled successfully",

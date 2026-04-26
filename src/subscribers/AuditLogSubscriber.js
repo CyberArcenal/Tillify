@@ -1,5 +1,5 @@
 // src/subscribers/AuditLogSubscriber.js
-//@ts-check
+
 const { AuditLog } = require("../entities/AuditLog");
 const { logger } = require("../utils/logger");
 

@@ -1,8 +1,7 @@
 // src/main/ipc/inventory/get/stock_history.ipc.js
-//@ts-check
 
-const InventoryMovement = require("../../../../entities/InventoryMovement");
-const { AppDataSource } = require("../../../db/datasource");
+
+const inventoryMovementService = require("../../../../services/InventoryMovement");
 
 /**
  * Get stock change history for a specific product over time.
@@ -20,27 +19,17 @@ module.exports = async (params, queryRunner) => {
       return { status: false, message: "Valid product ID is required", data: null };
     }
 
-    const repo = queryRunner
-      ? queryRunner.manager.getRepository(InventoryMovement)
-      : AppDataSource.getRepository(InventoryMovement);
+    const movements = await inventoryMovementService.findAll(
+      {
+        productId: Number(productId),
+        startDate,
+        endDate,
+        sortBy: "timestamp",
+        sortOrder: "ASC",
+      },
+      queryRunner
+    );
 
-    const queryBuilder = repo
-      .createQueryBuilder("movement")
-      .leftJoinAndSelect("movement.product", "product")
-      .leftJoinAndSelect("movement.sale", "sale")
-      .where("movement.productId = :productId", { productId })
-      .orderBy("movement.timestamp", "ASC");
-
-    if (startDate) {
-      queryBuilder.andWhere("movement.timestamp >= :startDate", { startDate });
-    }
-    if (endDate) {
-      queryBuilder.andWhere("movement.timestamp <= :endDate", { endDate });
-    }
-
-    const movements = await queryBuilder.getMany();
-
-    // Optionally compute running balance (if needed, can be done client-side)
     return {
       status: true,
       message: "Stock history retrieved",
@@ -50,7 +39,6 @@ module.exports = async (params, queryRunner) => {
     console.error("Error in getProductStockHistory:", error);
     return {
       status: false,
-      // @ts-ignore
       message: error.message || "Failed to retrieve stock history",
       data: null,
     };

@@ -1,4 +1,4 @@
-// @ts-check
+
 const returnRefundService = require("../../../services/ReturnRefundService");
 
 /**
@@ -6,7 +6,7 @@ const returnRefundService = require("../../../services/ReturnRefundService");
  * @param {Object} params - Request parameters.
  * @param {number} params.id - Return ID.
  * @param {string} [user='system'] - Username.
- * @param {import('typeorm').QueryRunner} [queryRunner] - Transaction runner.
+ * @param {import('typeorm').QueryRunner} queryRunner - Transaction runner.
  * @returns {Promise<{status: boolean, message: string, data: any}>}
  */
 module.exports = async (params, queryRunner) => {
@@ -16,7 +16,7 @@ module.exports = async (params, queryRunner) => {
       throw new Error("Valid return ID is required");
     }
 
-    const deleted = await returnRefundService.delete(id, user);
+    const deleted = await returnRefundService.delete(id, user, queryRunner);
     return {
       status: true,
       message: "Return cancelled successfully",

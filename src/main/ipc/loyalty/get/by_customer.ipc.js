@@ -1,7 +1,7 @@
 // src/main/ipc/loyalty/get/by_customer.ipc.js
-//@ts-check
-const { AppDataSource } = require("../../../db/datasource");
-const LoyaltyTransaction = require("../../../../entities/LoyaltyTransaction");
+
+
+const loyaltyTransactionService = require("../../../../services/LoyaltyTransaction");
 
 /**
  * Get loyalty transactions for a specific customer
@@ -14,28 +14,15 @@ const LoyaltyTransaction = require("../../../../entities/LoyaltyTransaction");
 module.exports = async (params) => {
   try {
     if (!params.customerId) {
-      return {
-        status: false,
-        message: 'Missing required parameter: customerId',
-        data: null,
-      };
+      return { status: false, message: 'Missing required parameter: customerId', data: null };
     }
-
-    const txRepo = AppDataSource.getRepository(LoyaltyTransaction);
-    const queryBuilder = txRepo
-      .createQueryBuilder('tx')
-      .leftJoinAndSelect('tx.customer', 'customer')
-      .leftJoinAndSelect('tx.sale', 'sale')
-      .where('tx.customerId = :customerId', { customerId: params.customerId })
-      .orderBy('tx.timestamp', 'DESC');
-
-    if (params.page && params.limit) {
-      const skip = (params.page - 1) * params.limit;
-      queryBuilder.skip(skip).take(params.limit);
-    }
-
-    const transactions = await queryBuilder.getMany();
-
+    const transactions = await loyaltyTransactionService.findAll({
+      customerId: params.customerId,
+      page: params.page,
+      limit: params.limit,
+      sortBy: 'timestamp',
+      sortOrder: 'DESC',
+    });
     return {
       status: true,
       data: transactions,

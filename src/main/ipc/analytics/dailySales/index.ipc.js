@@ -1,6 +1,6 @@
 // src/main/ipc/dailySales/index.ipc.js
 // Daily Sales Handler (Read-Only)
-//@ts-check
+
 const { ipcMain } = require("electron");
 const { logger } = require("../../../../utils/logger");
 // @ts-ignore

@@ -1,29 +1,49 @@
-//@ts-check
+
 const saleService = require("../../../services/Sale");
+const csv = require("csv-parse/sync");
 
 /**
  * @param {Object} params
- * @param {string} params.format - 'csv' or 'json'
- * @param {Object} params.filters - filters for findAll
+ * @param {string} params.csvData - Raw CSV string
  * @param {string} [params.user]
  * @param {import("typeorm").QueryRunner} queryRunner
  */
 module.exports = async (params, queryRunner) => {
   try {
-    const { format = "json", filters = {}, user } = params;
-    console.log("[IPC] sale:export_csv called", { format, filters });
-    const exportData = await saleService.exportSales(format, filters, user || "system");
+    const { csvData, user = "system" } = params;
+    if (!csvData) return { status: false, message: "csvData is required", data: null };
+
+    const records = csv.parse(csvData, { columns: true, skip_empty_lines: true });
+    const results = [];
+    for (const record of records) {
+      const saleData = {
+        // @ts-ignore
+        items: JSON.parse(record.items || "[]"),
+        // @ts-ignore
+        customerId: record.customerId ? parseInt(record.customerId) : undefined,
+        // @ts-ignore
+        paymentMethod: record.paymentMethod,
+        // @ts-ignore
+        notes: record.notes,
+        // @ts-ignore
+        loyaltyRedeemed: record.loyaltyRedeemed ? parseInt(record.loyaltyRedeemed) : 0,
+      };
+      const created = await saleService.create(saleData, user, queryRunner);
+      results.push(created);
+    }
+
+    console.log(`[IPC] sale:import_csv imported ${results.length} sales`);
     return {
       status: true,
-      message: "Export successful",
-      data: exportData,
+      message: "Import successful",
+      data: results,
     };
   } catch (error) {
-    console.error("[IPC] sale:export_csv error:", error);
+    console.error("[IPC] sale:import_csv error:", error);
     return {
       status: false,
       // @ts-ignore
-      message: error.message || "Failed to export sales",
+      message: error.message || "Failed to import sales",
       data: null,
     };
   }

@@ -1,4 +1,4 @@
-// @ts-check
+
 const returnRefundService = require("../../../services/ReturnRefundService");
 
 /**
@@ -7,7 +7,7 @@ const returnRefundService = require("../../../services/ReturnRefundService");
  * @param {string} [params.format='csv'] - Export format (only 'csv' supported here).
  * @param {Object} [params.filters] - Filters to apply before export.
  * @param {string} [user='system'] - Username.
- * @param {import('typeorm').QueryRunner} [queryRunner] - Optional transaction runner.
+ * @param {import('typeorm').QueryRunner} [queryRunner] - Optional transaction runner (unused for export).
  * @returns {Promise<{status: boolean, message: string, data: any}>}
  */
 module.exports = async (params, queryRunner) => {
@@ -21,6 +21,7 @@ module.exports = async (params, queryRunner) => {
       "csv",
       filters,
       user,
+      queryRunner // export is read-only, but pass anyway
     );
     return {
       status: true,

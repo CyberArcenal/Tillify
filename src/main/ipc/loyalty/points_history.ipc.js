@@ -1,8 +1,7 @@
 // src/main/ipc/loyalty/points_history.ipc.js
-//@ts-check
 
-const LoyaltyTransaction = require("../../../entities/LoyaltyTransaction");
-const { AppDataSource } = require("../../db/datasource");
+
+const customerService = require("../../../services/Customer");
 
 /**
  * Generate points history for a specific customer (running balance over time)
@@ -18,25 +17,29 @@ module.exports = async (params) => {
       return { status: false, message: 'customerId is required', data: null };
     }
 
-    const txRepo = AppDataSource.getRepository(LoyaltyTransaction);
+    // Get all transactions for customer (unpaginated)
+    const transactions = await customerService.getLoyaltyHistory(
+      Number(params.customerId),
+      {
+        sortBy: 'timestamp',
+        sortOrder: 'ASC',
+      }
+    );
 
-    const queryBuilder = txRepo
-      .createQueryBuilder('tx')
-      .where('tx.customerId = :customerId', { customerId: params.customerId })
-      .orderBy('tx.timestamp', 'ASC');
-
+    // Filter by date range manually if needed (service doesn't support date filters directly)
+    let filtered = transactions;
     if (params.startDate) {
-      queryBuilder.andWhere('tx.timestamp >= :startDate', { startDate: params.startDate });
+      const start = new Date(params.startDate);
+      filtered = filtered.filter(tx => new Date(tx.timestamp) >= start);
     }
     if (params.endDate) {
-      queryBuilder.andWhere('tx.timestamp <= :endDate', { endDate: params.endDate });
+      const end = new Date(params.endDate);
+      filtered = filtered.filter(tx => new Date(tx.timestamp) <= end);
     }
-
-    const transactions = await queryBuilder.getMany();
 
     // Compute running balance
     let balance = 0;
-    const history = transactions.map(tx => {
+    const history = filtered.map(tx => {
       balance += tx.pointsChange;
       return {
         id: tx.id,

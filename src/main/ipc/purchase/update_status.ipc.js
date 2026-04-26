@@ -1,5 +1,5 @@
 // src/main/ipc/purchase/update_status.ipc.js
-// @ts-check
+
 
 const purchaseService = require('../../../services/PurchaseService');
 
@@ -25,7 +25,7 @@ module.exports = async (params, queryRunner) => {
     }
 
     // Use update method with only status change
-    const updatedPurchase = await purchaseService.update(id, { status }, user);
+    const updatedPurchase = await purchaseService.update(id, { status }, user, queryRunner);
     return {
       status: true,
       message: "Purchase status updated successfully",

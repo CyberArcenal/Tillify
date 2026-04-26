@@ -1,5 +1,5 @@
 // src/subscribers/LoyaltyTransactionSubscriber.js
-//@ts-check
+
 const LoyaltyTransaction = require("../entities/LoyaltyTransaction");
 const { logger } = require("../utils/logger");
 

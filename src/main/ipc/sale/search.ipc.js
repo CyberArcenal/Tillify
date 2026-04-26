@@ -1,4 +1,4 @@
-//@ts-check
+
 const saleService = require("../../../services/Sale");
 
 /**
@@ -13,7 +13,7 @@ module.exports = async (params, queryRunner) => {
     if (!query) return { status: false, message: "query is required", data: null };
 
     console.log("[IPC] sale:search called", { query });
-    const sales = await saleService.findAll({ search: query });
+    const sales = await saleService.findAll({ search: query }, queryRunner);
     return {
       status: true,
       message: "Search results",

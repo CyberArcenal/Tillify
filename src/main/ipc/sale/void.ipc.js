@@ -1,4 +1,4 @@
-//@ts-check
+
 const saleService = require("../../../services/Sale");
 
 /**
@@ -15,7 +15,7 @@ module.exports = async (params, queryRunner) => {
     if (!reason) return { status: false, message: "reason is required", data: null };
 
     console.log("[IPC] sale:void called", { id, reason });
-    const result = await saleService.voidSale(id, reason, user || "system");
+   const result = await saleService.voidSale(id, reason, user, queryRunner);
     return {
       status: true,
       message: "Sale voided successfully",

@@ -1,5 +1,7 @@
 // src/main/ipc/loyalty/generate_report.ipc.js
-//@ts-check
+
+
+const loyaltyTransactionService = require("../../../services/LoyaltyTransaction");
 
 /**
  * Generate a loyalty report (summary and statistics)
@@ -12,32 +14,22 @@
  */
 module.exports = async (params) => {
   try {
-    // Use statistics endpoint as base, but we can add more reporting logic
-    const statisticsHandler = require('./get/statistics.ipc');
-    const statsResult = await statisticsHandler();
+    const stats = await loyaltyTransactionService.getStatistics();
 
-    if (!statsResult.status) {
-      return statsResult;
-    }
-
-    // Optionally add date-range filtered data
     let filteredData = null;
     if (params.startDate || params.endDate) {
-      const allHandler = require('./get/all.ipc');
-      const allResult = await allHandler({
-        startDate: params.startDate,
-        endDate: params.endDate,
-        limit: 1000, // reasonable limit for report
-      });
-      if (allResult.status) {
-        filteredData = allResult.data;
-      }
+      const filters = {};
+      if (params.startDate) filters.startDate = params.startDate;
+      if (params.endDate) filters.endDate = params.endDate;
+      filters.limit = 1000;
+      const allResult = await loyaltyTransactionService.findAll(filters);
+      filteredData = allResult;
     }
 
     return {
       status: true,
       data: {
-        statistics: statsResult.data,
+        statistics: stats,
         filteredTransactions: filteredData,
         reportGeneratedAt: new Date().toISOString(),
         params,

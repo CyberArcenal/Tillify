@@ -1,5 +1,5 @@
 // src/main/ipc/sale/index.ipc.js - Sale Management Handler
-//@ts-check
+
 const { ipcMain } = require("electron");
 const { logger } = require("../../../utils/logger");
 const { AppDataSource } = require("../../db/datasource");

@@ -1,4 +1,4 @@
-// @ts-check
+
 const returnRefundService = require("../../../services/ReturnRefundService");
 
 /**
@@ -7,7 +7,7 @@ const returnRefundService = require("../../../services/ReturnRefundService");
  * @param {number} params.id - Return ID.
  * @param {string} params.status - New status ('pending', 'processed', 'cancelled').
  * @param {string} [user='system'] - Username.
- * @param {import('typeorm').QueryRunner} [queryRunner] - Transaction runner.
+ * @param {import('typeorm').QueryRunner} queryRunner - Transaction runner.
  * @returns {Promise<{status: boolean, message: string, data: any}>}
  */
 module.exports = async (params, queryRunner) => {
@@ -20,8 +20,7 @@ module.exports = async (params, queryRunner) => {
       throw new Error("Valid status is required");
     }
 
-    // Reuse the update method with only the status field.
-    const updated = await returnRefundService.update(id, { status }, user);
+    const updated = await returnRefundService.update(id, { status }, user, queryRunner);
     return {
       status: true,
       message: "Return status updated successfully",
