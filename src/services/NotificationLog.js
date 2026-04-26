@@ -39,7 +39,7 @@ class NotificationLogService {
   }
 
   async initialize() {
-    const { AppDataSource } = require("../main/db/datasource");
+    const { AppDataSource } = require("../main/db/dataSource");
     if (!AppDataSource.isInitialized) {
       await AppDataSource.initialize();
     }
@@ -64,7 +64,7 @@ class NotificationLogService {
     if (qr) {
       return qr.manager.getRepository(entityClass);
     }
-    const { AppDataSource } = require("../main/db/datasource");
+    const { AppDataSource } = require("../main/db/dataSource");
     return AppDataSource.getRepository(entityClass);
   }
 

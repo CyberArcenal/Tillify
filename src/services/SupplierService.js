@@ -9,7 +9,7 @@ class SupplierService {
   }
 
   async initialize() {
-    const { AppDataSource } = require("../main/db/datasource");
+    const { AppDataSource } = require("../main/db/dataSource");
     const Supplier = require("../entities/Supplier");
     const Product = require("../entities/Product");
 
@@ -41,7 +41,7 @@ class SupplierService {
     if (qr) {
       return qr.manager.getRepository(entityClass);
     }
-    const { AppDataSource } = require("../main/db/datasource");
+    const { AppDataSource } = require("../main/db/dataSource");
     return AppDataSource.getRepository(entityClass);
   }
 

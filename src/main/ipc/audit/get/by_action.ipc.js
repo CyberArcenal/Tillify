@@ -1,5 +1,5 @@
 // src/main/ipc/auditlog/get/by_action.ipc.js
-const { AppDataSource } = require("../../../db/datasource");
+const { AppDataSource } = require("../../../db/dataSource");
 const { AuditLog } = require("../../../../entities/AuditLog");
 
 module.exports = async (params) => {

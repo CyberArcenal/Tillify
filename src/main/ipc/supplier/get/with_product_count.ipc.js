@@ -1,6 +1,6 @@
 // src/main/ipc/supplier/get/with_product_count.ipc
 
-const { AppDataSource } = require("../../../db/datasource");
+const { AppDataSource } = require("../../../db/dataSource");
 const { logger } = require("../../../../utils/logger");
 const Supplier = require("../../../../entities/Supplier");
 

@@ -87,14 +87,14 @@ class DeviceInfo {
 // Main License Service
 class LicenseService {
   constructor() {
-    const { AppDataSource } = require("../main/db/datasource");
+    const { AppDataSource } = require("../main/db/dataSource");
     const { activationClient } = require("../utils/activationClient");
     this.repository = AppDataSource.getRepository(LicenseCache);
     this.client = activationClient;
   }
 
   async getRepository() {
-    const { AppDataSource } = require("../main/db/datasource");
+    const { AppDataSource } = require("../main/db/dataSource");
     if (!AppDataSource.isInitialized) {
       await AppDataSource.initialize();
     }

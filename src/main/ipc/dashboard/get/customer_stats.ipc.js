@@ -2,7 +2,7 @@
 
 const Customer = require("../../../../entities/Customer");
 const Sale = require("../../../../entities/Sale");
-const { AppDataSource } = require("../../../db/datasource");
+const { AppDataSource } = require("../../../db/dataSource");
 const { subDays, startOfDay, endOfDay } = require("date-fns");
 
 /**

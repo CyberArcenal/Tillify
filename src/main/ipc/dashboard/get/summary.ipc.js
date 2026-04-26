@@ -3,7 +3,7 @@ const Customer = require("../../../../entities/Customer");
 const InventoryMovement = require("../../../../entities/InventoryMovement");
 const Product = require("../../../../entities/Product");
 const Sale = require("../../../../entities/Sale");
-const { AppDataSource } = require("../../../db/datasource");
+const { AppDataSource } = require("../../../db/dataSource");
 const { format, startOfDay, endOfDay } = require("date-fns");
 
 /**

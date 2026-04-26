@@ -2,7 +2,7 @@
 
 const Customer = require("../../../entities/Customer");
 const LoyaltyTransaction = require("../../../entities/LoyaltyTransaction");
-const { AppDataSource } = require("../../db/datasource");
+const { AppDataSource } = require("../../db/dataSource");
 
 /**
  * Generate loyalty-specific report

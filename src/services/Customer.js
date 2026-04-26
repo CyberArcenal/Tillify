@@ -10,7 +10,7 @@ class CustomerService {
   }
 
   async initialize() {
-    const { AppDataSource } = require("../main/db/datasource");
+    const { AppDataSource } = require("../main/db/dataSource");
     const Customer = require("../entities/Customer");
     const LoyaltyTransaction = require("../entities/LoyaltyTransaction");
     const Sale = require("../entities/Sale");
@@ -46,7 +46,7 @@ class CustomerService {
     if (qr) {
       return qr.manager.getRepository(entityClass);
     }
-    const { AppDataSource } = require("../main/db/datasource");
+    const { AppDataSource } = require("../main/db/dataSource");
     return AppDataSource.getRepository(entityClass);
   }
 

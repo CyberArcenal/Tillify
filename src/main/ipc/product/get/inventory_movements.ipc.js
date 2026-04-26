@@ -1,6 +1,6 @@
 // src/main/ipc/product/get/inventory_movements.ipc
 
-const { AppDataSource } = require("../../../db/datasource");
+const { AppDataSource } = require("../../../db/dataSource");
 const InventoryMovement = require("../../../../entities/InventoryMovement");
 
 /**

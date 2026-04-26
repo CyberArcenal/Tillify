@@ -9,7 +9,7 @@ const { ipcMain } = require("electron");
 const path = require("path");
 const { logger } = require("../../utils/logger");
 const { SystemSetting, SettingType } = require("../../entities/systemSettings");
-const { AppDataSource } = require("../db/datasource");
+const { AppDataSource } = require("../db/dataSource");
 
 class SystemConfigHandler {
   constructor() {

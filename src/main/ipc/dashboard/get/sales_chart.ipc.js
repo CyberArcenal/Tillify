@@ -1,6 +1,6 @@
 // src/main/ipc/dashboard/get/sales_chart.ipc.js
 const Sale = require("../../../../entities/Sale");
-const { AppDataSource } = require("../../../db/datasource");
+const { AppDataSource } = require("../../../db/dataSource");
 const { subDays, format, startOfDay, endOfDay } = require("date-fns");
 
 /**

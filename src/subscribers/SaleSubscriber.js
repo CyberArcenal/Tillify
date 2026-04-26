@@ -1,7 +1,7 @@
 // src/subscribers/SaleSubscriber.js
 
 const Sale = require("../entities/Sale");
-const { AppDataSource } = require("../main/db/datasource");
+const { AppDataSource } = require("../main/db/dataSource");
 const { SaleStateTransitionService } = require("../StateTransitionServices/Sale");
 const { logger } = require("../utils/logger");
 

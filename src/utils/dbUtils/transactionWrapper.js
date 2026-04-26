@@ -1,6 +1,6 @@
 
 
-const { AppDataSource } = require("../../main/db/datasource");
+const { AppDataSource } = require("../../main/db/dataSource");
 
 class TransactionError extends Error {
   /**

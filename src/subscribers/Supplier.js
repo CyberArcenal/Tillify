@@ -1,6 +1,6 @@
 
 const Supplier = require("../entities/Supplier");
-const { AppDataSource } = require("../main/db/datasource");
+const { AppDataSource } = require("../main/db/dataSource");
 
 console.log("[Subscriber] Loading SupplierSubscriber");
 

@@ -1,7 +1,7 @@
 // src/scheduler/auditTrailCleanupScheduler.js
 
 
-const { AppDataSource } = require("../main/db/datasource");
+const { AppDataSource } = require("../main/db/dataSource");
 const { logger } = require("../utils/logger");
 const { auditLogEnabled, logRetentionDays } = require("../utils/system");
 

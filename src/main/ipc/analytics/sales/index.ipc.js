@@ -3,7 +3,7 @@
 
 const { ipcMain } = require("electron");
 const { logger } = require("../../../../utils/logger");
-const { AppDataSource } = require("../../../db/datasource");
+const { AppDataSource } = require("../../../db/dataSource");
 const Sale = require("../../../../entities/Sale");
 const SaleItem = require("../../../../entities/SaleItem");
 const { withErrorHandling } = require("../../../../middlewares/errorHandler");

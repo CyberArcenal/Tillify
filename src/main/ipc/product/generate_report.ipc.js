@@ -5,7 +5,7 @@ const fs = require("fs").promises;
 const path = require("path");
 const { app } = require("electron");
 const productService = require("../../../services/Product");
-const { AppDataSource } = require("../../db/datasource");
+const { AppDataSource } = require("../../db/dataSource");
 const SaleItem = require("../../../entities/SaleItem");
 
 module.exports = async (params) => {
@@ -89,7 +89,7 @@ module.exports = async (params) => {
 // const path = require("path");
 // const { app } = require("electron");
 // const productService = require("../../../services/Product");
-// const { AppDataSource } = require("../../db/datasource");
+// const { AppDataSource } = require("../../db/dataSource");
 // const SaleItem = require("../../../entities/SaleItem");
 
 // /**

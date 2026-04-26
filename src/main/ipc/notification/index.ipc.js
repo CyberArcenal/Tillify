@@ -3,7 +3,7 @@ const { ipcMain } = require("electron");
 const { logger } = require("../../../utils/logger");
 const notificationService = require("../../../services/NotificationService");
 const { withErrorHandling } = require("../../../middlewares/errorHandler");
-const { AppDataSource } = require("../../db/datasource");
+const { AppDataSource } = require("../../db/dataSource");
 
 class NotificationHandler {
   constructor() {}

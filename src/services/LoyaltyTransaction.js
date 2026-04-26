@@ -10,7 +10,7 @@ class LoyaltyTransactionService {
   }
 
   async initialize() {
-    const { AppDataSource } = require("../main/db/datasource");
+    const { AppDataSource } = require("../main/db/dataSource");
     const LoyaltyTransaction = require("../entities/LoyaltyTransaction");
     const Customer = require("../entities/Customer");
     const Sale = require("../entities/Sale");
@@ -45,7 +45,7 @@ class LoyaltyTransactionService {
     if (qr) {
       return qr.manager.getRepository(entityClass);
     }
-    const { AppDataSource } = require("../main/db/datasource");
+    const { AppDataSource } = require("../main/db/dataSource");
     return AppDataSource.getRepository(entityClass);
   }
 

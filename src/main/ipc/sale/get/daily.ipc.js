@@ -1,6 +1,6 @@
 
 const Sale = require("../../../../entities/Sale");
-const { AppDataSource } = require("../../../db/datasource");
+const { AppDataSource } = require("../../../db/dataSource");
 
 /**
  * Get daily sales summary (grouped by day)
