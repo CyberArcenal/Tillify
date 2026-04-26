@@ -1,5 +1,5 @@
 // src/subscribers/InventoryMovementSubscriber.js
-//@ts-check
+
 const InventoryMovement = require("../entities/InventoryMovement");
 const { logger } = require("../utils/logger");
 

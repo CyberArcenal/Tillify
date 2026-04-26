@@ -1,5 +1,5 @@
 // src/main/ipcHandlers/activationHandlers.js
-//@ts-check
+
 const { ipcMain, dialog, app, BrowserWindow } = require("electron");
 const fs = require("fs").promises;
 const path = require("path");

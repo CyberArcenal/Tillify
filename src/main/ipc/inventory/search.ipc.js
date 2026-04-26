@@ -1,7 +1,7 @@
 // src/main/ipc/inventory/search.ipc.js
-//@ts-check
-const { AppDataSource } = require("../../db/datasource");
-const InventoryMovement = require("../../../entities/InventoryMovement");
+
+
+const inventoryMovementService = require("../../../services/InventoryMovement");
 
 /**
  * Search inventory movements by keyword (notes) and optional filters.
@@ -18,18 +18,15 @@ module.exports = async (params, queryRunner) => {
       return { status: false, message: "Search keyword is required", data: null };
     }
 
-    const repo = queryRunner
-      ? queryRunner.manager.getRepository(InventoryMovement)
-      : AppDataSource.getRepository(InventoryMovement);
-
-    const movements = await repo
-      .createQueryBuilder("movement")
-      .leftJoinAndSelect("movement.product", "product")
-      .leftJoinAndSelect("movement.sale", "sale")
-      .where("movement.notes LIKE :keyword", { keyword: `%${keyword}%` })
-      .orderBy("movement.timestamp", "DESC")
-      .take(limit)
-      .getMany();
+    const movements = await inventoryMovementService.findAll(
+      {
+        search: keyword,
+        limit,
+        sortBy: "timestamp",
+        sortOrder: "DESC",
+      },
+      queryRunner
+    );
 
     return {
       status: true,

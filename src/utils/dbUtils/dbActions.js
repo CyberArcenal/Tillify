@@ -1,5 +1,5 @@
 // src/utils/dbActions.js
-// @ts-check
+
 const auditLogger = require("../auditLogger");
 const { loadSubscribers } = require("./subscriberRegistry");
 const subscribers = loadSubscribers();

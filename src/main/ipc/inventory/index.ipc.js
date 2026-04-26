@@ -1,5 +1,5 @@
 // src/main/ipc/inventory/index.ipc.js - Inventory Movement Management Handler
-//@ts-check
+
 const { ipcMain } = require("electron");
 const { logger } = require("../../../utils/logger");
 const { AppDataSource } = require("../../db/datasource");

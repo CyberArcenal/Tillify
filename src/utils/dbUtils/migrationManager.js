@@ -1,5 +1,5 @@
 // src/utils/migrationManager.js
-//@ts-check
+
 const fs = require("fs").promises;
 const path = require("path");
 const { app } = require("electron");

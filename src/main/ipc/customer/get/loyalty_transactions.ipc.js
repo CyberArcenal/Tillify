@@ -1,4 +1,4 @@
-//@ts-check
+
 
 const customerService = require("../../../../services/Customer");
 

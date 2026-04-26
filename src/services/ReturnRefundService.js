@@ -1,9 +1,5 @@
 // services/ReturnRefundService.js
-// @ts-check
-
 const auditLogger = require("../utils/auditLogger");
-// @ts-ignore
-
 const { validateReturnData } = require("../utils/returnUtils");
 
 // 🔧 SETTINGS INTEGRATION: import needed settings getters
@@ -56,82 +52,81 @@ class ReturnRefundService {
   }
 
   /**
+   * Helper: get a repository (transactional if queryRunner provided)
+   * @param {import("typeorm").QueryRunner | null} qr
+   * @param {Function} entityClass
+   * @returns {import("typeorm").Repository<any>}
+   */
+  _getRepo(qr, entityClass) {
+    if (qr) {
+      return qr.manager.getRepository(entityClass);
+    }
+    const { AppDataSource } = require("../main/db/datasource");
+    return AppDataSource.getRepository(entityClass);
+  }
+
+  /**
    * Create a new return/refund with items
    * @param {Object} returnData - Return data including items
    * @param {string} user - User performing the action
+   * @param {import("typeorm").QueryRunner | null} qr - Optional transaction query runner
    */
-  async create(returnData, user = "system") {
-    const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
-    const {
-      return: returnRepo,
-      sale: saleRepo,
-      customer: customerRepo,
-      product: productRepo,
-    } = await this.getRepositories();
+  async create(returnData, user = "system", qr = null) {
+    const { saveDb } = require("../utils/dbUtils/dbActions");
+    const ReturnRefund = require("../entities/ReturnRefund");
+    const Sale = require("../entities/Sale");
+    const Customer = require("../entities/Customer");
+    const Product = require("../entities/Product");
+
+    const returnRepo = this._getRepo(qr, ReturnRefund);
+    const saleRepo = this._getRepo(qr, Sale);
+    const customerRepo = this._getRepo(qr, Customer);
+    const productRepo = this._getRepo(qr, Product);
 
     try {
-      // 🔧 SETTINGS INTEGRATION: check if refunds are allowed globally
       const refundsAllowed = await allowRefunds();
       if (!refundsAllowed) {
         throw new Error("Refunds are disabled in system settings.");
       }
 
-      // Validate return data
       const validation = validateReturnData(returnData);
       if (!validation.valid) {
         throw new Error(validation.errors.join(", "));
       }
 
       const {
-        // @ts-ignore
         referenceNo,
-        // @ts-ignore
         saleId,
-        // @ts-ignore
         customerId,
-        // @ts-ignore
         reason = null,
-        // @ts-ignore
         refundMethod,
-        // @ts-ignore
         status = "pending",
-        // @ts-ignore
         items = [],
       } = returnData;
 
       console.log(`Creating return: Reference ${referenceNo}`);
 
-      // Check sale exists and is eligible for return
-      // @ts-ignore
-      const sale = await saleRepo.findOne({
-        where: { id: saleId },
-      });
+      const sale = await saleRepo.findOne({ where: { id: saleId } });
       if (!sale) {
         throw new Error(`Sale with ID ${saleId} not found`);
       }
 
-      // 🔧 SETTINGS INTEGRATION: ensure sale is paid
       if (sale.status !== "paid") {
         throw new Error(
-          `Only paid sales can be refunded. Current status: ${sale.status}`,
+          `Only paid sales can be refunded. Current status: ${sale.status}`
         );
       }
 
-      // 🔧 SETTINGS INTEGRATION: check refund window
-      const windowDays = await refundWindowDays();
-      // @ts-ignore
+      const windowDaysSetting = await refundWindowDays();
       const saleDate = new Date(sale.timestamp);
       const now = new Date();
-      // @ts-ignore
       const diffDays = Math.floor((now - saleDate) / (1000 * 60 * 60 * 24));
-      if (diffDays > windowDays) {
+      if (diffDays > windowDaysSetting) {
         throw new Error(
-          `Refund window is ${windowDays} days. This sale is ${diffDays} days old.`,
+          `Refund window is ${windowDaysSetting} days. This sale is ${diffDays} days old.`
         );
       }
 
-      // Check customer exists
-      // @ts-ignore
       const customer = await customerRepo.findOne({
         where: { id: customerId },
       });
@@ -139,22 +134,18 @@ class ReturnRefundService {
         throw new Error(`Customer with ID ${customerId} not found`);
       }
 
-      // Check reference uniqueness if provided
       if (referenceNo) {
-        // @ts-ignore
         const existing = await returnRepo.findOne({ where: { referenceNo } });
         if (existing) {
           throw new Error(
-            `Return with reference "${referenceNo}" already exists`,
+            `Return with reference "${referenceNo}" already exists`
           );
         }
       }
 
-      // Prepare return items with calculated subtotals
       const returnItems = [];
       let totalAmount = 0;
       for (const item of items) {
-        // @ts-ignore
         const product = await productRepo.findOne({
           where: { id: item.productId },
         });
@@ -175,10 +166,8 @@ class ReturnRefundService {
         });
       }
 
-      // Create return entity
-      // @ts-ignore
       const returnRefund = returnRepo.create({
-        referenceNo,
+        referenceNo: referenceNo || generateReturnReference(),
         sale,
         customer,
         reason,
@@ -189,24 +178,31 @@ class ReturnRefundService {
         createdAt: new Date(),
       });
 
-      // Save return (cascade will save items)
-      // @ts-ignore
       const savedReturn = await saveDb(returnRepo, returnRefund);
 
-      await auditLogger.logCreate(
-        "ReturnRefund",
-        savedReturn.id,
-        savedReturn,
-        user,
-      );
+      if (qr) {
+        const auditRepo = qr.manager.getRepository("AuditLog");
+        await auditRepo.save({
+          action: "CREATE",
+          entity: "ReturnRefund",
+          entityId: savedReturn.id,
+          user,
+          description: `Created return ${savedReturn.referenceNo}`,
+        });
+      } else {
+        await auditLogger.logCreate(
+          "ReturnRefund",
+          savedReturn.id,
+          savedReturn,
+          user
+        );
+      }
 
       console.log(
-        `Return created: #${savedReturn.id} - ${savedReturn.referenceNo}`,
+        `Return created: #${savedReturn.id} - ${savedReturn.referenceNo}`
       );
-
       return savedReturn;
     } catch (error) {
-      // @ts-ignore
       console.error("Failed to create return:", error.message);
       throw error;
     }
@@ -217,18 +213,21 @@ class ReturnRefundService {
    * @param {number} id - Return ID
    * @param {Object} returnData - Updated fields (items not allowed if processed)
    * @param {string} user - User performing the action
+   * @param {import("typeorm").QueryRunner | null} qr - Optional transaction query runner
    */
-  async update(id, returnData, user = "system") {
-    const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
-    const {
-      return: returnRepo,
-      sale: saleRepo,
-      customer: customerRepo,
-      product: productRepo,
-    } = await this.getRepositories();
+  async update(id, returnData, user = "system", qr = null) {
+    const { updateDb } = require("../utils/dbUtils/dbActions");
+    const ReturnRefund = require("../entities/ReturnRefund");
+    const Sale = require("../entities/Sale");
+    const Customer = require("../entities/Customer");
+    const Product = require("../entities/Product");
+
+    const returnRepo = this._getRepo(qr, ReturnRefund);
+    const saleRepo = this._getRepo(qr, Sale);
+    const customerRepo = this._getRepo(qr, Customer);
+    const productRepo = this._getRepo(qr, Product);
 
     try {
-      // @ts-ignore
       const existingReturn = await returnRepo.findOne({
         where: { id },
         relations: ["sale", "customer", "items", "items.product"],
@@ -237,7 +236,6 @@ class ReturnRefundService {
         throw new Error(`Return with ID ${id} not found`);
       }
 
-      // Prevent updates if return is already processed or cancelled
       if (existingReturn.status === "processed") {
         throw new Error("Cannot update a processed return");
       }
@@ -248,92 +246,63 @@ class ReturnRefundService {
       const oldData = { ...existingReturn };
       const oldStatus = existingReturn.status;
 
-      // Handle sale change (should be rare, but allow if pending)
-      // @ts-ignore
       if (returnData.saleId && returnData.saleId !== existingReturn.sale.id) {
-        // @ts-ignore
         const sale = await saleRepo.findOne({
-          // @ts-ignore
           where: { id: returnData.saleId },
         });
         if (!sale) {
-          // @ts-ignore
           throw new Error(`Sale with ID ${returnData.saleId} not found`);
         }
-        // @ts-ignore
         existingReturn.sale = sale;
       }
 
-      // Handle customer change
       if (
-        // @ts-ignore
         returnData.customerId &&
-        // @ts-ignore
         returnData.customerId !== existingReturn.customer.id
       ) {
-        // @ts-ignore
         const customer = await customerRepo.findOne({
-          // @ts-ignore
           where: { id: returnData.customerId },
         });
         if (!customer) {
           throw new Error(
-            // @ts-ignore
-            `Customer with ID ${returnData.customerId} not found`,
+            `Customer with ID ${returnData.customerId} not found`
           );
         }
-        // @ts-ignore
         existingReturn.customer = customer;
       }
 
-      // Handle reference change uniqueness
       if (
-        // @ts-ignore
         returnData.referenceNo &&
-        // @ts-ignore
         returnData.referenceNo !== existingReturn.referenceNo
       ) {
-        // @ts-ignore
         const existing = await returnRepo.findOne({
-          // @ts-ignore
           where: { referenceNo: returnData.referenceNo },
         });
         if (existing) {
           throw new Error(
-            // @ts-ignore
-            `Return with reference "${returnData.referenceNo}" already exists`,
+            `Return with reference "${returnData.referenceNo}" already exists`
           );
         }
-        // @ts-ignore
         existingReturn.referenceNo = returnData.referenceNo;
       }
 
-      // Handle items update if provided (only allowed for pending returns)
-      // @ts-ignore
       if (returnData.items) {
         if (existingReturn.status !== "pending") {
           throw new Error("Can only update items for pending returns");
         }
 
-        // Validate new items
-        // @ts-ignore
         const validation = validateReturnData({ items: returnData.items });
         if (!validation.valid) {
           throw new Error(validation.errors.join(", "));
         }
 
-        // Remove old items (cascade should handle)
-        // @ts-ignore
         if (existingReturn.items && existingReturn.items.length > 0) {
-          // @ts-ignore
           existingReturn.items = [];
         }
 
         const newItems = [];
         let totalAmount = 0;
-        // @ts-ignore
         for (const item of returnData.items) {
-          // @ts-ignore
           const product = await productRepo.findOne({
             where: { id: item.productId },
           });
@@ -353,26 +322,17 @@ class ReturnRefundService {
             reason: item.reason || null,
           });
         }
-        // @ts-ignore
         existingReturn.items = newItems;
         existingReturn.totalAmount = totalAmount;
       }
 
-      // Update other fields
-      // @ts-ignore
       if (returnData.reason !== undefined)
-        // @ts-ignore
         existingReturn.reason = returnData.reason;
-      // @ts-ignore
       if (returnData.refundMethod)
-        // @ts-ignore
         existingReturn.refundMethod = returnData.refundMethod;
 
-      // Handle status change
-      // @ts-ignore
       const newStatus = returnData.status;
       if (newStatus && newStatus !== oldStatus) {
-        // Validate status transition
         if (oldStatus === "cancelled") {
           throw new Error("Cannot change status of cancelled return");
         }
@@ -380,32 +340,27 @@ class ReturnRefundService {
           throw new Error("Cannot revert processed return");
         }
 
-        // 🔧 SETTINGS INTEGRATION: if moving to 'processed', re-check refund window and sale status
         if (newStatus === "processed") {
           const refundsAllowed = await allowRefunds();
           if (!refundsAllowed) {
             throw new Error(
-              "Refunds are disabled in system settings. Cannot process return.",
+              "Refunds are disabled in system settings. Cannot process return."
             );
           }
 
-          const windowDays = await refundWindowDays();
-          // @ts-ignore
+          const windowDaysSetting = await refundWindowDays();
           const saleDate = new Date(existingReturn.sale.timestamp);
           const now = new Date();
-          // @ts-ignore
           const diffDays = Math.floor((now - saleDate) / (1000 * 60 * 60 * 24));
-          if (diffDays > windowDays) {
+          if (diffDays > windowDaysSetting) {
             throw new Error(
-              `Refund window is ${windowDays} days. This sale is ${diffDays} days old. Cannot process.`,
+              `Refund window is ${windowDaysSetting} days. This sale is ${diffDays} days old. Cannot process.`
             );
           }
 
-          // @ts-ignore
           if (existingReturn.sale.status !== "paid") {
             throw new Error(
-              // @ts-ignore
-              `Cannot process return for sale with status ${existingReturn.sale.status}`,
+              `Cannot process return for sale with status ${existingReturn.sale.status}`
             );
           }
         }
@@ -414,23 +369,30 @@ class ReturnRefundService {
       }
 
       existingReturn.updatedAt = new Date();
-
-      // Save updated return
-      // @ts-ignore
       const savedReturn = await updateDb(returnRepo, existingReturn);
 
-      await auditLogger.logUpdate(
-        "ReturnRefund",
-        id,
-        oldData,
-        savedReturn,
-        user,
-      );
+      if (qr) {
+        const auditRepo = qr.manager.getRepository("AuditLog");
+        await auditRepo.save({
+          action: "UPDATE",
+          entity: "ReturnRefund",
+          entityId: id,
+          user,
+          description: `Updated return #${id}`,
+        });
+      } else {
+        await auditLogger.logUpdate(
+          "ReturnRefund",
+          id,
+          oldData,
+          savedReturn,
+          user
+        );
+      }
 
       console.log(`Return updated: #${id}`);
       return savedReturn;
     } catch (error) {
-      // @ts-ignore
       console.error("Failed to update return:", error.message);
       throw error;
     }
@@ -440,13 +402,14 @@ class ReturnRefundService {
    * Soft delete a return (set status to cancelled)
    * @param {number} id - Return ID
    * @param {string} user - User performing the action
+   * @param {import("typeorm").QueryRunner | null} qr - Optional transaction query runner
    */
-  async delete(id, user = "system") {
-    const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
-    const { return: returnRepo } = await this.getRepositories();
+  async delete(id, user = "system", qr = null) {
+    const { updateDb } = require("../utils/dbUtils/dbActions");
+    const ReturnRefund = require("../entities/ReturnRefund");
+    const returnRepo = this._getRepo(qr, ReturnRefund);
 
     try {
-      // @ts-ignore
       const returnRefund = await returnRepo.findOne({
         where: { id },
         relations: ["items"],
@@ -463,29 +426,81 @@ class ReturnRefundService {
       returnRefund.status = "cancelled";
       returnRefund.updatedAt = new Date();
 
-      // @ts-ignore
       const savedReturn = await updateDb(returnRepo, returnRefund);
 
-      await auditLogger.logDelete("ReturnRefund", id, oldData, user);
+      if (qr) {
+        const auditRepo = qr.manager.getRepository("AuditLog");
+        await auditRepo.save({
+          action: "DELETE",
+          entity: "ReturnRefund",
+          entityId: id,
+          user,
+          description: `Cancelled return #${id}`,
+        });
+      } else {
+        await auditLogger.logDelete("ReturnRefund", id, oldData, user);
+      }
 
       console.log(`Return cancelled: #${id}`);
       return savedReturn;
     } catch (error) {
-      // @ts-ignore
       console.error("Failed to delete return:", error.message);
       throw error;
     }
   }
 
   /**
+   * Hard delete a return – only allowed if not processed or if no inventory impact?
+   * @param {number} id - Return ID
+   * @param {string} user - User performing the action
+   * @param {import("typeorm").QueryRunner | null} qr - Optional transaction query runner
+   */
+  async permanentlyDelete(id, user = "system", qr = null) {
+    const { removeDb } = require("../utils/dbUtils/dbActions");
+    const ReturnRefund = require("../entities/ReturnRefund");
+    const returnRepo = this._getRepo(qr, ReturnRefund);
+
+    const returnRefund = await returnRepo.findOne({
+      where: { id },
+      relations: ["items"],
+    });
+    if (!returnRefund) {
+      throw new Error(`Return with ID ${id} not found`);
+    }
+
+    // Prevent hard delete if processed (because inventory may have been updated)
+    if (returnRefund.status === "processed") {
+      throw new Error("Cannot permanently delete a processed return");
+    }
+
+    await removeDb(returnRepo, returnRefund);
+
+    if (qr) {
+      const auditRepo = qr.manager.getRepository("AuditLog");
+      await auditRepo.save({
+        action: "DELETE",
+        entity: "ReturnRefund",
+        entityId: id,
+        user,
+        description: `Permanently deleted return #${id}`,
+      });
+    } else {
+      await auditLogger.logDelete("ReturnRefund", id, returnRefund, user);
+    }
+
+    console.log(`Return #${id} permanently deleted`);
+  }
+
+  /**
    * Find return by ID
    * @param {number} id
+   * @param {import("typeorm").QueryRunner | null} qr - Optional transaction query runner
    */
-  async findById(id) {
-    const { return: returnRepo } = await this.getRepositories();
+  async findById(id, qr = null) {
+    const ReturnRefund = require("../entities/ReturnRefund");
+    const returnRepo = this._getRepo(qr, ReturnRefund);
 
     try {
-      // @ts-ignore
       const returnRefund = await returnRepo.findOne({
         where: { id },
         relations: ["sale", "customer", "items", "items.product"],
@@ -493,11 +508,9 @@ class ReturnRefundService {
       if (!returnRefund) {
         throw new Error(`Return with ID ${id} not found`);
       }
-      // @ts-ignore
       await auditLogger.logView("ReturnRefund", id, "system");
       return returnRefund;
     } catch (error) {
-      // @ts-ignore
       console.error("Failed to find return:", error.message);
       throw error;
     }
@@ -506,12 +519,13 @@ class ReturnRefundService {
   /**
    * Find all returns with optional filters
    * @param {Object} options - Filter options
+   * @param {import("typeorm").QueryRunner | null} qr - Optional transaction query runner
    */
-  async findAll(options = {}) {
-    const { return: returnRepo } = await this.getRepositories();
+  async findAll(options = {}, qr = null) {
+    const ReturnRefund = require("../entities/ReturnRefund");
+    const returnRepo = this._getRepo(qr, ReturnRefund);
 
     try {
-      // @ts-ignore
       const queryBuilder = returnRepo
         .createQueryBuilder("return")
         .leftJoinAndSelect("return.sale", "sale")
@@ -519,70 +533,46 @@ class ReturnRefundService {
         .leftJoinAndSelect("return.items", "items")
         .leftJoinAndSelect("items.product", "product");
 
-      // Filter by status
-      // @ts-ignore
       if (options.status) {
         queryBuilder.andWhere("return.status = :status", {
-          // @ts-ignore
           status: options.status,
         });
       }
 
-      // Filter by sale
-      // @ts-ignore
       if (options.saleId) {
-        // @ts-ignore
         queryBuilder.andWhere("sale.id = :saleId", { saleId: options.saleId });
       }
 
-      // Filter by customer
-      // @ts-ignore
       if (options.customerId) {
         queryBuilder.andWhere("customer.id = :customerId", {
-          // @ts-ignore
           customerId: options.customerId,
         });
       }
 
-      // Date range
-      // @ts-ignore
       if (options.startDate) {
         queryBuilder.andWhere("return.createdAt >= :startDate", {
-          // @ts-ignore
           startDate: options.startDate,
         });
       }
-      // @ts-ignore
       if (options.endDate) {
         queryBuilder.andWhere("return.createdAt <= :endDate", {
-          // @ts-ignore
           endDate: options.endDate,
         });
       }
 
-      // Search by reference or reason
-      // @ts-ignore
       if (options.search) {
         queryBuilder.andWhere(
           "(return.referenceNo LIKE :search OR return.reason LIKE :search)",
-          // @ts-ignore
-          { search: `%${options.search}%` },
+          { search: `%${options.search}%` }
         );
       }
 
-      // Sorting
-      // @ts-ignore
       const sortBy = options.sortBy || "createdAt";
-      // @ts-ignore
       const sortOrder = options.sortOrder === "ASC" ? "ASC" : "DESC";
       queryBuilder.orderBy(`return.${sortBy}`, sortOrder);
 
-      // Pagination
-      // @ts-ignore
       if (options.page && options.limit) {
-        // @ts-ignore
         const offset = (options.page - 1) * options.limit;
-        // @ts-ignore
         queryBuilder.skip(offset).take(options.limit);
       }
 
@@ -598,13 +588,13 @@ class ReturnRefundService {
 
   /**
    * Get return statistics
+   * @param {import("typeorm").QueryRunner | null} qr
    */
-  async getStatistics() {
-    const { return: returnRepo } = await this.getRepositories();
+  async getStatistics(qr = null) {
+    const ReturnRefund = require("../entities/ReturnRefund");
+    const returnRepo = this._getRepo(qr, ReturnRefund);
 
     try {
-      // Count by status
-      // @ts-ignore
       const statusCounts = await returnRepo
         .createQueryBuilder("return")
         .select("return.status", "status")
@@ -612,24 +602,18 @@ class ReturnRefundService {
         .groupBy("return.status")
         .getRawMany();
 
-      // Total refund amount for processed returns
-      // @ts-ignore
       const totalProcessed = await returnRepo
         .createQueryBuilder("return")
         .select("SUM(return.totalAmount)", "total")
         .where("return.status = :status", { status: "processed" })
         .getRawOne();
 
-      // Average refund amount
-      // @ts-ignore
       const avgAmount = await returnRepo
         .createQueryBuilder("return")
         .select("AVG(return.totalAmount)", "average")
         .where("return.status = :status", { status: "processed" })
         .getRawOne();
 
-      // Top customers by return count/amount
-      // @ts-ignore
       const topCustomers = await returnRepo
         .createQueryBuilder("return")
         .leftJoin("return.customer", "customer")
@@ -660,10 +644,16 @@ class ReturnRefundService {
    * @param {string} format - 'csv' or 'json'
    * @param {Object} filters - Export filters
    * @param {string} user
+   * @param {import("typeorm").QueryRunner | null} qr
    */
-  async exportReturns(format = "json", filters = {}, user = "system") {
+  async exportReturns(
+    format = "json",
+    filters = {},
+    user = "system",
+    qr = null
+  ) {
     try {
-      const returns = await this.findAll(filters);
+      const returns = await this.findAll(filters, qr);
 
       let exportData;
       if (format === "csv") {
@@ -681,31 +671,31 @@ class ReturnRefundService {
         const rows = returns.map((r) => [
           r.id,
           r.referenceNo || "",
-          // @ts-ignore
           r.sale?.id || "",
-          // @ts-ignore
           r.customer?.name || "",
           r.reason || "",
           r.refundMethod,
           r.totalAmount,
           r.status,
-          // @ts-ignore
           new Date(r.createdAt).toLocaleDateString(),
         ]);
         exportData = {
           format: "csv",
           data: [headers, ...rows].map((row) => row.join(",")).join("\n"),
-          filename: `returns_export_${new Date().toISOString().split("T")[0]}.csv`,
+          filename: `returns_export_${
+            new Date().toISOString().split("T")[0]
+          }.csv`,
         };
       } else {
         exportData = {
           format: "json",
           data: returns,
-          filename: `returns_export_${new Date().toISOString().split("T")[0]}.json`,
+          filename: `returns_export_${
+            new Date().toISOString().split("T")[0]
+          }.json`,
         };
       }
 
-      // @ts-ignore
       await auditLogger.logExport("ReturnRefund", format, filters, user);
       console.log(`Exported ${returns.length} returns in ${format} format`);
       return exportData;
@@ -714,8 +704,98 @@ class ReturnRefundService {
       throw error;
     }
   }
+
+  /**
+   * Bulk create multiple returns
+   * @param {Array<Object>} returnsArray
+   * @param {string} user
+   * @param {import("typeorm").QueryRunner | null} qr
+   */
+  async bulkCreate(returnsArray, user = "system", qr = null) {
+    const results = { created: [], errors: [] };
+    for (const returnData of returnsArray) {
+      try {
+        const saved = await this.create(returnData, user, qr);
+        results.created.push(saved);
+      } catch (err) {
+        results.errors.push({ return: returnData, error: err.message });
+      }
+    }
+    return results;
+  }
+
+  /**
+   * Bulk update multiple returns
+   * @param {Array<{ id: number, updates: Object }>} updatesArray
+   * @param {string} user
+   * @param {import("typeorm").QueryRunner | null} qr
+   */
+  async bulkUpdate(updatesArray, user = "system", qr = null) {
+    const results = { updated: [], errors: [] };
+    for (const { id, updates } of updatesArray) {
+      try {
+        const saved = await this.update(id, updates, user, qr);
+        results.updated.push(saved);
+      } catch (err) {
+        results.errors.push({ id, updates, error: err.message });
+      }
+    }
+    return results;
+  }
+
+  /**
+   * Import returns from a CSV file
+   * @param {string} filePath
+   * @param {string} user
+   * @param {import("typeorm").QueryRunner | null} qr
+   */
+  async importFromCSV(filePath, user = "system", qr = null) {
+    const fs = require("fs").promises;
+    const csv = require("csv-parse/sync");
+    const fileContent = await fs.readFile(filePath, "utf-8");
+    const records = csv.parse(fileContent, {
+      columns: true,
+      skip_empty_lines: true,
+      trim: true,
+    });
+
+    const results = { imported: [], errors: [] };
+    for (const record of records) {
+      try {
+        let items = [];
+        if (record.items) {
+          items = JSON.parse(record.items);
+        }
+        const returnData = {
+          referenceNo: record.referenceNo || undefined,
+          saleId: parseInt(record.saleId, 10),
+          customerId: parseInt(record.customerId, 10),
+          reason: record.reason || null,
+          refundMethod: record.refundMethod,
+          status: record.status || "pending",
+          items: items,
+        };
+        const validation = validateReturnData(returnData);
+        if (!validation.valid) throw new Error(validation.errors.join(", "));
+        const saved = await this.create(returnData, user, qr);
+        results.imported.push(saved);
+      } catch (err) {
+        results.errors.push({ row: record, error: err.message });
+      }
+    }
+    return results;
+  }
 }
 
 // Singleton instance
 const returnRefundService = new ReturnRefundService();
 module.exports = returnRefundService;
+
+function generateReturnReference() {
+  const prefix = "RET";
+  const timestamp = Date.now().toString().slice(-8);
+  const random = Math.floor(Math.random() * 10000)
+    .toString()
+    .padStart(4, "0");
+  return `${prefix}-${timestamp}-${random}`;
+}

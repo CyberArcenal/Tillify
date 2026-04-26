@@ -1,7 +1,5 @@
 // src/main/ipc/supplier/update.ipc
-// @ts-check
 const { logger } = require("../../../utils/logger");
-const auditLogger = require("../../../utils/auditLogger");
 const supplierService = require("../../../services/SupplierService");
 
 /**
@@ -10,6 +8,8 @@ const supplierService = require("../../../services/SupplierService");
  * @param {number} params.id - Supplier ID
  * @param {string} [params.name] - New name
  * @param {string} [params.contactInfo] - New contact info
+ * @param {string} [params.email] - New email
+ * @param {string} [params.phone] - New phone
  * @param {string} [params.address] - New address
  * @param {boolean} [params.isActive] - New active status
  * @param {string} [params.user] - User performing action
@@ -18,18 +18,20 @@ const supplierService = require("../../../services/SupplierService");
  */
 module.exports = async (params, queryRunner) => {
   try {
-    const updated = await supplierService.update(params.id, params);
-
+    const { id, user = "system", ...updateData } = params;
+    if (!id || isNaN(Number(id))) {
+      throw new Error("Valid supplier ID is required");
+    }
+    const updated = await supplierService.update(Number(id), updateData, user, queryRunner);
     return {
       status: true,
+      message: "Supplier updated successfully",
       data: updated,
     };
   } catch (error) {
-    // @ts-ignore
     logger?.error("updateSupplier error:", error);
     return {
       status: false,
-      // @ts-ignore
       message: error.message || "Failed to update supplier",
       data: null,
     };

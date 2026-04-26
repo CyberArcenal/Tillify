@@ -1,8 +1,7 @@
 // src/main/ipc/purchase/export_csv.ipc.js
-// @ts-check
+
 
 const purchaseService = require("../../../services/PurchaseService");
-
 
 /**
  * Export purchases to CSV format
@@ -15,11 +14,11 @@ module.exports = async (params) => {
   try {
     const { filters = {}, user = "system" } = params;
 
-    // exportPurchases expects format, filters, user
+    // exportPurchases expects: format, filters, user, queryRunner (optional)
     const exportData = await purchaseService.exportPurchases(
       "csv",
       filters,
-      user,
+      user
     );
     return {
       status: true,

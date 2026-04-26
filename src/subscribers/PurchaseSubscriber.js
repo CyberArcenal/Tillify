@@ -1,4 +1,4 @@
-//@ts-check
+
 const Purchase = require("../entities/Purchase");
 const {
   PurchaseStateTransitionService,

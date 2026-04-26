@@ -1,5 +1,5 @@
 // src/services/PurchaseStateTransitionService.js
-//@ts-check
+
 const Product = require("../entities/Product");
 const InventoryMovement = require("../entities/InventoryMovement");
 const auditLogger = require("../utils/auditLogger");

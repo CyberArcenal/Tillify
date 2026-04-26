@@ -1,5 +1,5 @@
 // src/main/ipc/supplier/get/all.ipc
-// @ts-check
+
 const supplierService = require("../../../../services/SupplierService");
 const { logger } = require("../../../../utils/logger");
 

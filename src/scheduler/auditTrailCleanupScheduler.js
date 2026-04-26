@@ -1,5 +1,5 @@
 // src/scheduler/auditTrailCleanupScheduler.js
-//@ts-check
+
 
 const { AppDataSource } = require("../main/db/datasource");
 const { logger } = require("../utils/logger");

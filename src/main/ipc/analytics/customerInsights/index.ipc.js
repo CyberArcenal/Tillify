@@ -1,6 +1,6 @@
 // src/main/ipc/customerInsights/index.ipc.js
 // Customer Insights Handler (Read-Only)
-//@ts-check
+
 const { ipcMain } = require("electron");
 const { logger } = require("../../../../utils/logger");
 // @ts-ignore

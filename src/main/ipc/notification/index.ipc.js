@@ -1,55 +1,48 @@
 // src/main/ipc/notification/index.ipc.js
-//@ts-check
 const { ipcMain } = require("electron");
 const { logger } = require("../../../utils/logger");
 const notificationService = require("../../../services/NotificationService");
 const { withErrorHandling } = require("../../../middlewares/errorHandler");
+const { AppDataSource } = require("../../db/datasource");
 
 class NotificationHandler {
-  constructor() {
-    // No need to import separate files – we handle all methods in the switch
-  }
+  constructor() {}
 
-  // @ts-ignore
+  /**
+   * @param {any} event
+   * @param {{ method: any; params: {}; }} payload
+   */
   async handleRequest(event, payload) {
     try {
       const method = payload.method;
       const params = payload.params || {};
 
-      // @ts-ignore
-      logger.info(`NotificationHandler: ${method}`, { params });
-
-      // All methods are assumed to require a  (extract from auth/session)
-      // For simplicity, we require params. to be passed from renderer.
+      if (logger) logger.info(`NotificationHandler: ${method}`, { params });
 
       switch (method) {
-        // 📨 CREATE – should only be used internally, but we keep it for completeness
+        // 📨 CREATE – transactional
         case "create":
-          return await this.create(params);
+          return await this.handleWithTransaction(this.create, params);
 
-        // 📋 READ OPERATIONS
+        // 📋 READ OPERATIONS (no transaction)
         case "getAll":
           return await this.getAll(params);
-
         case "getById":
           return await this.getById(params.id);
-
         case "getUnreadCount":
           return await this.getUnreadCount();
-
         case "getStats":
           return await this.getStats();
 
-        // ✏️ UPDATE OPERATIONS
+        // ✏️ UPDATE – transactional
         case "markAsRead":
-          return await this.markAsRead(params.id, params.isRead);
-
+          return await this.handleWithTransaction(this.markAsRead, params);
         case "markAllAsRead":
-          return await this.markAllAsRead();
+          return await this.handleWithTransaction(this.markAllAsRead, params);
 
-        // 🗑 DELETE
+        // 🗑 DELETE – transactional
         case "delete":
-          return await this.delete(params.id);
+          return await this.handleWithTransaction(this.delete, params);
 
         default:
           return {
@@ -59,34 +52,62 @@ class NotificationHandler {
           };
       }
     } catch (error) {
-      // @ts-ignore
-      logger.error("NotificationHandler error:", error);
+      if (logger) logger.error("NotificationHandler error:", error);
       return {
         status: false,
-        // @ts-ignore
         message: error.message || "Internal server error",
         data: null,
       };
     }
   }
 
+  /**
+   * Wrap write operations in a database transaction
+   * @param {(params: any, queryRunner: import("typeorm").QueryRunner) => Promise<any>} handler
+   * @param {any} params
+   */
+  async handleWithTransaction(handler, params) {
+    const queryRunner = AppDataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const result = await handler(params, queryRunner);
+      if (result.status) {
+        await queryRunner.commitTransaction();
+      } else {
+        await queryRunner.rollbackTransaction();
+      }
+      return result;
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
   // --- Handlers (each calls the service) ---
 
-  // @ts-ignore
-  async create(params) {
+  /**
+   * @param {{ title: any; message: any; type: any; metadata: any; user?: string }} params
+   * @param {import("typeorm").QueryRunner} queryRunner
+   */
+  async create(params, queryRunner) {
     const { title, message, type, metadata, user = "system" } = params;
-    // @ts-ignore
-    if (!title || !message) {
-      throw new Error("Missing required fields: title, message");
-    }
+    if (!title || !message) throw new Error("Missing required fields: title, message");
+
     const result = await notificationService.create(
       { title, message, type, metadata },
-      user
+      user,
+      queryRunner
     );
     return { status: true, data: result };
   }
 
-  // @ts-ignore
+  /**
+   * @param {{ isRead?: boolean; limit?: number; offset?: number; sortBy?: string; sortOrder?: string }} params
+   */
   async getAll(params) {
     const { isRead, limit, offset, sortBy, sortOrder } = params;
     const result = await notificationService.findAll({
@@ -99,7 +120,9 @@ class NotificationHandler {
     return { status: true, data: result };
   }
 
-  // @ts-ignore
+  /**
+   * @param {number} id
+   */
   async getById(id) {
     const result = await notificationService.findById(id);
     return { status: true, data: result };
@@ -115,20 +138,35 @@ class NotificationHandler {
     return { status: true, data: stats };
   }
 
-  // @ts-ignore
-  async markAsRead(id, isRead = true) {
-    const result = await notificationService.markAsRead(id, isRead, "system");
+  /**
+   * @param {{ id: number; isRead?: boolean; user?: string }} params
+   * @param {import("typeorm").QueryRunner} queryRunner
+   */
+  async markAsRead(params, queryRunner) {
+    const { id, isRead = true, user = "system" } = params;
+    if (!id) throw new Error("id is required");
+    const result = await notificationService.markAsRead(id, isRead, user, queryRunner);
     return { status: true, data: result };
   }
 
-  async markAllAsRead() {
-    const count = await notificationService.markAllAsRead("system");
+  /**
+   * @param {{ user?: string }} params
+   * @param {import("typeorm").QueryRunner} queryRunner
+   */
+  async markAllAsRead(params, queryRunner) {
+    const { user = "system" } = params;
+    const count = await notificationService.markAllAsRead(user, queryRunner);
     return { status: true, data: { updatedCount: count } };
   }
 
-  // @ts-ignore
-  async delete(id) {
-    const result = await notificationService.delete(id, "system");
+  /**
+   * @param {{ id: number; user?: string }} params
+   * @param {import("typeorm").QueryRunner} queryRunner
+   */
+  async delete(params, queryRunner) {
+    const { id, user = "system" } = params;
+    if (!id) throw new Error("id is required");
+    const result = await notificationService.delete(id, user, queryRunner);
     return { status: true, data: result };
   }
 }

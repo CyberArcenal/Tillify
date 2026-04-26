@@ -1,13 +1,12 @@
 // src/main/ipc/supplier/bulk_create.ipc
-// @ts-check
+
 const { logger } = require("../../../utils/logger");
-const auditLogger = require("../../../utils/auditLogger");
 const supplierService = require("../../../services/SupplierService");
 
 /**
  * Bulk create suppliers (transactional)
  * @param {Object} params
- * @param {Array<{name: string, contactInfo?: string, address?: string, isActive?: boolean}>} params.suppliers - Array of supplier objects
+ * @param {Array<{name: string, contactInfo?: string, email?: string, phone?: string, address?: string, isActive?: boolean}>} params.suppliers - Array of supplier objects
  * @param {string} [params.user] - User performing action
  * @param {import("typeorm").QueryRunner} queryRunner - Transaction query runner
  * @returns {Promise<{status: boolean, message?: string, data?: any}>}
@@ -24,34 +23,18 @@ module.exports = async (params, queryRunner) => {
   }
 
   try {
-    /**
-     * @type {string | any[]}
-     */
-    const created = [];
-    const errors = [];
-
-    for (const data of suppliers) {
-      const { name, contactInfo, address, isActive = true } = data;
-      try {
-        const created = await supplierService.create(data);
-
-        // @ts-ignore
-        created.push(created);
-      } catch (err) {
-        errors.push({ data, error: `Name "${name}" already exists` });
-      }
-    }
-
+    const result = await supplierService.bulkCreate(suppliers, user, queryRunner);
     return {
-      status: true,
-      data: { created, errors },
+      status: result.errors.length === 0,
+      message: result.errors.length === 0
+        ? `Successfully created ${result.created.length} suppliers`
+        : `${result.created.length} created, ${result.errors.length} failed`,
+      data: result,
     };
   } catch (error) {
-    // @ts-ignore
     logger?.error("bulkCreateSuppliers error:", error);
     return {
       status: false,
-      // @ts-ignore
       message: error.message || "Failed to bulk create suppliers",
       data: null,
     };

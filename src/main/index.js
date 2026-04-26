@@ -1,6 +1,6 @@
 // index.js placeholder
 // src/main/index.js
-// @ts-check
+
 /**
  * @file Main entry point for retail Tillify System
  * @version 0.0.0

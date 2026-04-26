@@ -1,4 +1,4 @@
-// @ts-check
+
 
 const categoryService = require("../../../../services/CategoryService");
 

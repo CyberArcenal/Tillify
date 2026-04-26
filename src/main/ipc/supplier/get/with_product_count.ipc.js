@@ -1,5 +1,5 @@
 // src/main/ipc/supplier/get/with_product_count.ipc
-// @ts-check
+
 const { AppDataSource } = require("../../../db/datasource");
 const { logger } = require("../../../../utils/logger");
 const Supplier = require("../../../../entities/Supplier");

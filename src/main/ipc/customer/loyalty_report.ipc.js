@@ -1,4 +1,4 @@
-//@ts-check
+
 
 const Customer = require("../../../entities/Customer");
 const LoyaltyTransaction = require("../../../entities/LoyaltyTransaction");

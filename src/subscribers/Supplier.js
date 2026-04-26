@@ -1,4 +1,4 @@
-// @ts-check
+
 const Supplier = require("../entities/Supplier");
 const { AppDataSource } = require("../main/db/datasource");
 

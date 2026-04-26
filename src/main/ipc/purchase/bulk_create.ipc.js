@@ -1,5 +1,5 @@
 // src/main/ipc/purchase/bulk_create.ipc.js
-// @ts-check
+
 
 const purchaseService = require('../../../services/PurchaseService');
 
@@ -28,7 +28,7 @@ module.exports = async (params, queryRunner) => {
 
     for (const data of purchases) {
       try {
-        const created = await purchaseService.create(data, user);
+        const created = await purchaseService.create(data, user, queryRunner);
         createdPurchases.push(created);
       } catch (err) {
         errors.push({ data, error: err.message });

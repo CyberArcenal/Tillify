@@ -1,5 +1,5 @@
 // src/main/db/datasource.js
-//@ts-check
+
 const fs = require("fs");
 const path = require("path");
 const { DataSource } = require("typeorm");

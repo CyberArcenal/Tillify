@@ -1,9 +1,10 @@
 // src/main/ipc/loyalty/redeem_points.ipc.js
-//@ts-check
-const auditLogger = require("../../../utils/auditLogger");
+
+
+const customerService = require("../../../services/Customer");
 
 /**
- * Redeem loyalty points from a customer (wrapper around create with negative points)
+ * Redeem loyalty points from a customer
  * @param {Object} params
  * @param {number} params.customerId
  * @param {number} params.points - Positive number of points to redeem
@@ -15,27 +16,29 @@ const auditLogger = require("../../../utils/auditLogger");
  */
 module.exports = async (params, queryRunner) => {
   try {
-    if (!params.customerId) {
+    const { customerId, points, notes, saleId, user = 'system' } = params;
+
+    if (!customerId) {
       return { status: false, message: 'customerId is required', data: null };
     }
-    if (!params.points || params.points <= 0) {
+    if (!points || points <= 0) {
       return { status: false, message: 'points must be a positive number', data: null };
     }
 
-    // Reuse create handler with negative pointsChange
-    const createHandler = require('./create.ipc');
-    const result = await createHandler(
-      {
-        customerId: params.customerId,
-        pointsChange: -params.points,
-        notes: params.notes || 'Points redeemed',
-        saleId: params.saleId,
-        user: params.user,
-      },
+    const result = await customerService.redeemLoyaltyPoints(
+      Number(customerId),
+      Number(points),
+      notes || null,
+      saleId ? Number(saleId) : null,
+      user,
       queryRunner
     );
 
-    return result;
+    return {
+      status: true,
+      data: result,
+      message: 'Loyalty points redeemed successfully',
+    };
   } catch (error) {
     console.error('Error in redeemLoyaltyPoints:', error);
     return {

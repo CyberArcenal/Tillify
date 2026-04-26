@@ -1,5 +1,5 @@
 // src/main/ipc/product/get/by_sku.ipc
-//@ts-check
+
 const { AppDataSource } = require("../../../db/datasource");
 const Product = require("../../../../entities/Product");
 

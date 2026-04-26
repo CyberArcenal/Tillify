@@ -1,8 +1,5 @@
 // services/LoyaltyTransactionService.js
-//@ts-check
-
 const auditLogger = require("../utils/auditLogger");
-
 const { validateLoyaltyTransaction } = require("../utils/loyaltyUtils");
 
 class LoyaltyTransactionService {
@@ -21,8 +18,7 @@ class LoyaltyTransactionService {
     if (!AppDataSource.isInitialized) {
       await AppDataSource.initialize();
     }
-    this.transactionRepository =
-      AppDataSource.getRepository(LoyaltyTransaction);
+    this.transactionRepository = AppDataSource.getRepository(LoyaltyTransaction);
     this.customerRepository = AppDataSource.getRepository(Customer);
     this.saleRepository = AppDataSource.getRepository(Sale);
     console.log("LoyaltyTransactionService initialized");
@@ -40,6 +36,20 @@ class LoyaltyTransactionService {
   }
 
   /**
+   * Helper: get a repository (transactional if queryRunner provided)
+   * @param {import("typeorm").QueryRunner | null} qr
+   * @param {Function} entityClass
+   * @returns {import("typeorm").Repository<any>}
+   */
+  _getRepo(qr, entityClass) {
+    if (qr) {
+      return qr.manager.getRepository(entityClass);
+    }
+    const { AppDataSource } = require("../main/db/datasource");
+    return AppDataSource.getRepository(entityClass);
+  }
+
+  /**
    * Create a manual loyalty transaction (adjustment)
    * @param {Object} data - Transaction data
    * @param {number} data.customerId - Customer ID
@@ -47,17 +57,19 @@ class LoyaltyTransactionService {
    * @param {string} data.notes - Reason for adjustment
    * @param {number|null} data.saleId - Optional sale reference
    * @param {string} user - User performing the action
+   * @param {import("typeorm").QueryRunner | null} qr - Optional transaction query runner
    */
-  async createManual(data, user = "system") {
+  async createManual(data, user = "system", qr = null) {
     const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
-    const {
-      transaction: txRepo,
-      customer: customerRepo,
-      sale: saleRepo,
-    } = await this.getRepositories();
+    const LoyaltyTransaction = require("../entities/LoyaltyTransaction");
+    const Customer = require("../entities/Customer");
+    const Sale = require("../entities/Sale");
+
+    const txRepo = this._getRepo(qr, LoyaltyTransaction);
+    const customerRepo = this._getRepo(qr, Customer);
+    const saleRepo = this._getRepo(qr, Sale);
 
     try {
-      // Validate transaction data
       const validation = validateLoyaltyTransaction(data);
       if (!validation.valid) {
         throw new Error(validation.errors.join(", "));
@@ -65,52 +77,31 @@ class LoyaltyTransactionService {
 
       const { customerId, pointsChange, notes, saleId } = data;
 
-      // Fetch customer
-
-      // @ts-ignore
-      const customer = await customerRepo.findOne({
-        where: { id: customerId },
-      });
+      const customer = await customerRepo.findOne({ where: { id: customerId } });
       if (!customer) {
         throw new Error(`Customer with ID ${customerId} not found`);
       }
 
-      // Check sufficient balance for redemption
-      if (
-        pointsChange < 0 &&
-        // @ts-ignore
-        customer.loyaltyPointsBalance + pointsChange < 0
-      ) {
+      if (pointsChange < 0 && customer.loyaltyPointsBalance + pointsChange < 0) {
         throw new Error(
-          `Insufficient loyalty points. Available: ${customer.loyaltyPointsBalance}, Requested: ${-pointsChange}`,
+          `Insufficient loyalty points. Available: ${customer.loyaltyPointsBalance}, Requested: ${-pointsChange}`
         );
       }
 
-      // Fetch sale if provided
       let sale = null;
       if (saleId) {
-        // @ts-ignore
         sale = await saleRepo.findOne({ where: { id: saleId } });
         if (!sale) {
           throw new Error(`Sale with ID ${saleId} not found`);
         }
       }
 
-      // Record old balance for audit
       const oldBalance = customer.loyaltyPointsBalance;
-
-      // Update customer balance
-
-      // @ts-ignore
       customer.loyaltyPointsBalance += pointsChange;
       customer.updatedAt = new Date();
 
-      // @ts-ignore
       const updatedCustomer = await updateDb(customerRepo, customer);
 
-      // Create transaction record
-
-      // @ts-ignore
       const transaction = txRepo.create({
         pointsChange,
         notes,
@@ -119,35 +110,49 @@ class LoyaltyTransactionService {
         timestamp: new Date(),
       });
 
-      // @ts-ignore
       const savedTx = await saveDb(txRepo, transaction);
 
       // Audit logs
-      await auditLogger.logUpdate(
-        "Customer",
-        customerId,
-        { loyaltyPointsBalance: oldBalance },
-        { loyaltyPointsBalance: updatedCustomer.loyaltyPointsBalance },
-        user,
-      );
-      await auditLogger.logCreate(
-        "LoyaltyTransaction",
-        savedTx.id,
-        savedTx,
-        user,
-      );
+      if (qr) {
+        const auditRepo = qr.manager.getRepository("AuditLog");
+        await auditRepo.save([
+          {
+            action: "UPDATE",
+            entity: "Customer",
+            entityId: customerId,
+            user,
+            description: `Loyalty points changed from ${oldBalance} to ${updatedCustomer.loyaltyPointsBalance}`,
+          },
+          {
+            action: "CREATE",
+            entity: "LoyaltyTransaction",
+            entityId: savedTx.id,
+            user,
+            description: `Loyalty transaction recorded: ${pointsChange > 0 ? "+" : ""}${pointsChange}`,
+          },
+        ]);
+      } else {
+        await auditLogger.logUpdate(
+          "Customer",
+          customerId,
+          { loyaltyPointsBalance: oldBalance },
+          { loyaltyPointsBalance: updatedCustomer.loyaltyPointsBalance },
+          user
+        );
+        await auditLogger.logCreate(
+          "LoyaltyTransaction",
+          savedTx.id,
+          savedTx,
+          user
+        );
+      }
 
       console.log(
-        `Manual loyalty transaction created: ${pointsChange > 0 ? "+" : ""}${pointsChange} points for customer #${customerId}`,
+        `Manual loyalty transaction created: ${pointsChange > 0 ? "+" : ""}${pointsChange} points for customer #${customerId}`
       );
       return savedTx;
     } catch (error) {
-      console.error(
-        "Failed to create manual loyalty transaction:",
-
-        // @ts-ignore
-        error.message,
-      );
+      console.error("Failed to create manual loyalty transaction:", error.message);
       throw error;
     }
   }
@@ -155,12 +160,13 @@ class LoyaltyTransactionService {
   /**
    * Find a transaction by ID with relations
    * @param {number} id
+   * @param {import("typeorm").QueryRunner | null} qr - Optional transaction query runner
    */
-  async findById(id) {
-    const { transaction: txRepo } = await this.getRepositories();
+  async findById(id, qr = null) {
+    const LoyaltyTransaction = require("../entities/LoyaltyTransaction");
+    const txRepo = this._getRepo(qr, LoyaltyTransaction);
 
     try {
-      // @ts-ignore
       const transaction = await txRepo.findOne({
         where: { id },
         relations: ["customer", "sale"],
@@ -169,11 +175,9 @@ class LoyaltyTransactionService {
         throw new Error(`Loyalty transaction with ID ${id} not found`);
       }
 
-      // @ts-ignore
       await auditLogger.logView("LoyaltyTransaction", id, "system");
       return transaction;
     } catch (error) {
-      // @ts-ignore
       console.error("Failed to find loyalty transaction:", error.message);
       throw error;
     }
@@ -182,92 +186,60 @@ class LoyaltyTransactionService {
   /**
    * Find all transactions with optional filters
    * @param {Object} options - Filter options
+   * @param {import("typeorm").QueryRunner | null} qr - Optional transaction query runner
    */
-  async findAll(options = {}) {
-    const { transaction: txRepo } = await this.getRepositories();
+  async findAll(options = {}, qr = null) {
+    const LoyaltyTransaction = require("../entities/LoyaltyTransaction");
+    const txRepo = this._getRepo(qr, LoyaltyTransaction);
 
     try {
-      // @ts-ignore
       const queryBuilder = txRepo
         .createQueryBuilder("tx")
         .leftJoinAndSelect("tx.customer", "customer")
         .leftJoinAndSelect("tx.sale", "sale");
 
-      // Filter by customer
-
-      // @ts-ignore
       if (options.customerId) {
         queryBuilder.andWhere("tx.customerId = :customerId", {
-          // @ts-ignore
           customerId: options.customerId,
         });
       }
 
-      // Filter by sale
-
-      // @ts-ignore
       if (options.saleId) {
         queryBuilder.andWhere("tx.saleId = :saleId", {
-          // @ts-ignore
           saleId: options.saleId,
         });
       }
 
-      // Filter by date range
-
-      // @ts-ignore
       if (options.startDate) {
         queryBuilder.andWhere("tx.timestamp >= :startDate", {
-          // @ts-ignore
           startDate: options.startDate,
         });
       }
 
-      // @ts-ignore
       if (options.endDate) {
         queryBuilder.andWhere("tx.timestamp <= :endDate", {
-          // @ts-ignore
           endDate: options.endDate,
         });
       }
 
-      // Filter by points direction (earn/redeem)
-
-      // @ts-ignore
       if (options.type === "earn") {
         queryBuilder.andWhere("tx.pointsChange > 0");
-      // @ts-ignore
       } else if (options.type === "redeem") {
         queryBuilder.andWhere("tx.pointsChange < 0");
       }
 
-      // Search in notes
-
-      // @ts-ignore
       if (options.search) {
         queryBuilder.andWhere("tx.notes LIKE :search", {
-          // @ts-ignore
           search: `%${options.search}%`,
         });
       }
 
-      // Sorting
-
-      // @ts-ignore
       const sortBy = options.sortBy || "timestamp";
-
-      // @ts-ignore
       const sortOrder = options.sortOrder === "ASC" ? "ASC" : "DESC";
       queryBuilder.orderBy(`tx.${sortBy}`, sortOrder);
 
-      // Pagination
-
-      // @ts-ignore
       if (options.page && options.limit) {
-        // @ts-ignore
         const offset = (options.page - 1) * options.limit;
-
-        // @ts-ignore
         queryBuilder.skip(offset).take(options.limit);
       }
 
@@ -283,14 +255,13 @@ class LoyaltyTransactionService {
 
   /**
    * Get statistics about loyalty transactions
+   * @param {import("typeorm").QueryRunner | null} qr
    */
-  async getStatistics() {
-    const { transaction: txRepo } = await this.getRepositories();
+  async getStatistics(qr = null) {
+    const LoyaltyTransaction = require("../entities/LoyaltyTransaction");
+    const txRepo = this._getRepo(qr, LoyaltyTransaction);
 
     try {
-      // Total points earned (sum of positive changes)
-
-      // @ts-ignore
       const earnedResult = await txRepo
         .createQueryBuilder("tx")
         .select("SUM(tx.pointsChange)", "total")
@@ -298,9 +269,6 @@ class LoyaltyTransactionService {
         .getRawOne();
       const totalEarned = parseFloat(earnedResult.total) || 0;
 
-      // Total points redeemed (sum of absolute negative changes)
-
-      // @ts-ignore
       const redeemedResult = await txRepo
         .createQueryBuilder("tx")
         .select("SUM(ABS(tx.pointsChange))", "total")
@@ -308,21 +276,15 @@ class LoyaltyTransactionService {
         .getRawOne();
       const totalRedeemed = parseFloat(redeemedResult.total) || 0;
 
-      // Count of transactions by type
+      const earnCount = await txRepo
+        .createQueryBuilder("tx")
+        .where("tx.pointsChange > 0")
+        .getCount();
+      const redeemCount = await txRepo
+        .createQueryBuilder("tx")
+        .where("tx.pointsChange < 0")
+        .getCount();
 
-      // @ts-ignore
-      const earnCount = await txRepo.count({
-        where: { pointsChange: { $gt: 0 } },
-      }); // typeorm syntax may differ; using query builder
-
-      // @ts-ignore
-      const redeemCount = await txRepo.count({
-        where: { pointsChange: { $lt: 0 } },
-      });
-
-      // Most active customers (by transaction count)
-
-      // @ts-ignore
       const topCustomers = await txRepo
         .createQueryBuilder("tx")
         .select("tx.customerId", "customerId")
@@ -333,9 +295,7 @@ class LoyaltyTransactionService {
         .limit(5)
         .getRawMany();
 
-      // Transactions per month (last 6 months)
-
-      // @ts-ignore
+      // Monthly trends (SQLite syntax, adjust for other DBs if needed)
       const monthly = await txRepo
         .createQueryBuilder("tx")
         .select([
@@ -371,10 +331,11 @@ class LoyaltyTransactionService {
    * @param {string} format - 'csv' or 'json'
    * @param {Object} filters - Export filters (same as findAll)
    * @param {string} user
+   * @param {import("typeorm").QueryRunner | null} qr
    */
-  async exportTransactions(format = "json", filters = {}, user = "system") {
+  async exportTransactions(format = "json", filters = {}, user = "system", qr = null) {
     try {
-      const transactions = await this.findAll(filters);
+      const transactions = await this.findAll(filters, qr);
 
       let exportData;
       if (format === "csv") {
@@ -389,24 +350,11 @@ class LoyaltyTransactionService {
         ];
         const rows = transactions.map((tx) => [
           tx.id,
-
-          // @ts-ignore
           tx.customer?.name || "N/A",
-
-          // @ts-ignore
           tx.sale?.id || "",
           tx.pointsChange,
-
-          // @ts-ignore
-          tx.pointsChange > 0
-            ? "Earn"
-            // @ts-ignore
-            : tx.pointsChange < 0
-              ? "Redeem"
-              : "Zero",
+          tx.pointsChange > 0 ? "Earn" : tx.pointsChange < 0 ? "Redeem" : "Zero",
           tx.notes || "",
-
-          // @ts-ignore
           new Date(tx.timestamp).toLocaleString(),
         ]);
         exportData = {
@@ -422,16 +370,70 @@ class LoyaltyTransactionService {
         };
       }
 
-      // @ts-ignore
       await auditLogger.logExport("LoyaltyTransaction", format, filters, user);
       console.log(
-        `Exported ${transactions.length} loyalty transactions in ${format} format`,
+        `Exported ${transactions.length} loyalty transactions in ${format} format`
       );
       return exportData;
     } catch (error) {
       console.error("Failed to export loyalty transactions:", error);
       throw error;
     }
+  }
+
+  /**
+   * Bulk create manual loyalty transactions
+   * @param {Array<Object>} transactionsArray
+   * @param {string} user
+   * @param {import("typeorm").QueryRunner | null} qr
+   */
+  async bulkCreate(transactionsArray, user = "system", qr = null) {
+    const results = { created: [], errors: [] };
+    for (const txData of transactionsArray) {
+      try {
+        const saved = await this.createManual(txData, user, qr);
+        results.created.push(saved);
+      } catch (err) {
+        results.errors.push({ transaction: txData, error: err.message });
+      }
+    }
+    return results;
+  }
+
+  /**
+   * Import loyalty transactions from a CSV file
+   * @param {string} filePath
+   * @param {string} user
+   * @param {import("typeorm").QueryRunner | null} qr
+   */
+  async importFromCSV(filePath, user = "system", qr = null) {
+    const fs = require("fs").promises;
+    const csv = require("csv-parse/sync");
+    const fileContent = await fs.readFile(filePath, "utf-8");
+    const records = csv.parse(fileContent, {
+      columns: true,
+      skip_empty_lines: true,
+      trim: true,
+    });
+
+    const results = { imported: [], errors: [] };
+    for (const record of records) {
+      try {
+        const txData = {
+          customerId: parseInt(record.customerId, 10),
+          pointsChange: parseInt(record.pointsChange, 10),
+          notes: record.notes || null,
+          saleId: record.saleId ? parseInt(record.saleId, 10) : null,
+        };
+        const validation = validateLoyaltyTransaction(txData);
+        if (!validation.valid) throw new Error(validation.errors.join(", "));
+        const saved = await this.createManual(txData, user, qr);
+        results.imported.push(saved);
+      } catch (err) {
+        results.errors.push({ row: record, error: err.message });
+      }
+    }
+    return results;
   }
 }
 

@@ -1,5 +1,5 @@
 // src/main/ipc/inventory/get/by_type.ipc.js
-//@ts-check
+
 const { AppDataSource } = require("../../../db/datasource");
 const InventoryMovement = require("../../../../entities/InventoryMovement");
 

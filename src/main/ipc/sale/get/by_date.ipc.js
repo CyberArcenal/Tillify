@@ -1,4 +1,4 @@
-//@ts-check
+
 const saleService = require("../../../../services/Sale");
 
 /**

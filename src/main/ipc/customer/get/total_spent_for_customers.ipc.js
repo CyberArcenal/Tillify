@@ -1,5 +1,5 @@
 // src/main/ipc/customer/get/total_spent_for_customers.ipc.js
-//@ts-check
+
 const { AppDataSource } = require("../../../db/datasource");
 const Sale = require("../../../../entities/Sale");
 

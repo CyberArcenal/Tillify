@@ -1,5 +1,5 @@
 // utils/categoryUtils.js
-// @ts-check
+
 
 /**
  * Validate category data

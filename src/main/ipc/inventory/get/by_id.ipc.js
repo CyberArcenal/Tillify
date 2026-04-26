@@ -1,7 +1,7 @@
 // src/main/ipc/inventory/get/by_id.ipc.js
-//@ts-check
-const { AppDataSource } = require("../../../db/datasource");
-const InventoryMovement = require("../../../../entities/InventoryMovement");
+
+
+const inventoryMovementService = require("../../../../services/InventoryMovement");
 
 /**
  * Get a single inventory movement by its ID.
@@ -17,19 +17,7 @@ module.exports = async (params, queryRunner) => {
       return { status: false, message: "Valid movement ID is required", data: null };
     }
 
-    const repo = queryRunner
-      ? queryRunner.manager.getRepository(InventoryMovement)
-      : AppDataSource.getRepository(InventoryMovement);
-
-    const movement = await repo.findOne({
-      where: { id },
-      relations: ["product", "sale"],
-    });
-
-    if (!movement) {
-      return { status: false, message: `Inventory movement with ID ${id} not found`, data: null };
-    }
-
+    const movement = await inventoryMovementService.findById(Number(id), queryRunner);
     return {
       status: true,
       message: "Inventory movement retrieved successfully",

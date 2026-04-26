@@ -1,4 +1,4 @@
-//@ts-check
+
 const saleService = require("../../../services/Sale");
 
 /**
@@ -16,7 +16,7 @@ module.exports = async (params, queryRunner) => {
 
     const results = [];
     for (const saleData of sales) {
-      const created = await saleService.create(saleData, user || "system");
+      const created = await saleService.create(saleData, user || "system", queryRunner);
       results.push(created);
     }
 

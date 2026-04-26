@@ -1,5 +1,5 @@
 // src/main/ipc/barcode/index.ipc.js
-//@ts-check
+
 const { ipcMain } = require('electron');
 const { withErrorHandling } = require('../../../middlewares/errorHandler'); // adjust path
 const barcodeService = require('../../../services/BarcodeService');

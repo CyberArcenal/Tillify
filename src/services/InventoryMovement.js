@@ -1,8 +1,5 @@
 // services/InventoryMovementService.js
-//@ts-check
-
 const auditLogger = require("../utils/auditLogger");
-
 const { validateInventoryMovement } = require("../utils/inventoryUtils");
 
 class InventoryMovementService {
@@ -39,6 +36,20 @@ class InventoryMovementService {
   }
 
   /**
+   * Helper: get a repository (transactional if queryRunner provided)
+   * @param {import("typeorm").QueryRunner | null} qr
+   * @param {Function} entityClass
+   * @returns {import("typeorm").Repository<any>}
+   */
+  _getRepo(qr, entityClass) {
+    if (qr) {
+      return qr.manager.getRepository(entityClass);
+    }
+    const { AppDataSource } = require("../main/db/datasource");
+    return AppDataSource.getRepository(entityClass);
+  }
+
+  /**
    * Create a manual inventory adjustment movement
    * This will also update the product's stock quantity.
    * @param {Object} data - Movement data
@@ -48,17 +59,19 @@ class InventoryMovementService {
    * @param {string|null} data.notes - Reason for adjustment
    * @param {number|null} data.saleId - Optional sale reference
    * @param {string} user - User performing the action
+   * @param {import("typeorm").QueryRunner | null} qr - Optional transaction query runner
    */
-  async createAdjustment(data, user = "system") {
+  async createAdjustment(data, user = "system", qr = null) {
     const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
-    const {
-      movement: movementRepo,
-      product: productRepo,
-      sale: saleRepo,
-    } = await this.getRepositories();
+    const InventoryMovement = require("../entities/InventoryMovement");
+    const Product = require("../entities/Product");
+    const Sale = require("../entities/Sale");
+
+    const movementRepo = this._getRepo(qr, InventoryMovement);
+    const productRepo = this._getRepo(qr, Product);
+    const saleRepo = this._getRepo(qr, Sale);
 
     try {
-      // Validate movement data
       const validation = validateInventoryMovement(data);
       if (!validation.valid) {
         throw new Error(validation.errors.join(", "));
@@ -66,48 +79,31 @@ class InventoryMovementService {
 
       const { productId, qtyChange, movementType, notes, saleId } = data;
 
-      // Fetch product
-
-      // @ts-ignore
       const product = await productRepo.findOne({ where: { id: productId } });
       if (!product) {
         throw new Error(`Product with ID ${productId} not found`);
       }
 
-      // Check stock sufficiency if decreasing
-
-      // @ts-ignore
       if (qtyChange < 0 && product.stockQty + qtyChange < 0) {
         throw new Error(
-          `Insufficient stock. Available: ${product.stockQty}, Requested change: ${qtyChange}`,
+          `Insufficient stock. Available: ${product.stockQty}, Requested change: ${qtyChange}`
         );
       }
 
-      // Fetch sale if provided
       let sale = null;
       if (saleId) {
-        // @ts-ignore
         sale = await saleRepo.findOne({ where: { id: saleId } });
         if (!sale) {
           throw new Error(`Sale with ID ${saleId} not found`);
         }
       }
 
-      // Record old stock for audit
       const oldStock = product.stockQty;
-
-      // Update product stock
-
-      // @ts-ignore
       product.stockQty += qtyChange;
       product.updatedAt = new Date();
 
-      // @ts-ignore
       const updatedProduct = await updateDb(productRepo, product);
 
-      // Create movement record
-
-      // @ts-ignore
       const movement = movementRepo.create({
         movementType,
         qtyChange,
@@ -117,30 +113,50 @@ class InventoryMovementService {
         timestamp: new Date(),
       });
 
-      // @ts-ignore
       const savedMovement = await saveDb(movementRepo, movement);
 
       // Audit logs
-      await auditLogger.logUpdate(
-        "Product",
-        productId,
-        { stockQty: oldStock },
-        { stockQty: updatedProduct.stockQty },
-        user,
-      );
-      await auditLogger.logCreate(
-        "InventoryMovement",
-        savedMovement.id,
-        savedMovement,
-        user,
-      );
+      if (qr) {
+        const auditRepo = qr.manager.getRepository("AuditLog");
+        await auditRepo.save([
+          {
+            action: "UPDATE",
+            entity: "Product",
+            entityId: productId,
+            user,
+            description: `Stock changed from ${oldStock} to ${updatedProduct.stockQty} (${movementType})`,
+          },
+          {
+            action: "CREATE",
+            entity: "InventoryMovement",
+            entityId: savedMovement.id,
+            user,
+            description: `Inventory movement recorded: ${movementType} ${qtyChange}`,
+          },
+        ]);
+      } else {
+        await auditLogger.logUpdate(
+          "Product",
+          productId,
+          { stockQty: oldStock },
+          { stockQty: updatedProduct.stockQty },
+          user
+        );
+        await auditLogger.logCreate(
+          "InventoryMovement",
+          savedMovement.id,
+          savedMovement,
+          user
+        );
+      }
 
       console.log(
-        `Inventory adjustment created: ${qtyChange > 0 ? "+" : ""}${qtyChange} units for product #${productId}`,
+        `Inventory adjustment created: ${
+          qtyChange > 0 ? "+" : ""
+        }${qtyChange} units for product #${productId}`
       );
       return savedMovement;
     } catch (error) {
-      // @ts-ignore
       console.error("Failed to create inventory adjustment:", error.message);
       throw error;
     }
@@ -149,12 +165,13 @@ class InventoryMovementService {
   /**
    * Find a movement by ID with relations
    * @param {number} id
+   * @param {import("typeorm").QueryRunner | null} qr - Optional transaction query runner
    */
-  async findById(id) {
-    const { movement: movementRepo } = await this.getRepositories();
+  async findById(id, qr = null) {
+    const InventoryMovement = require("../entities/InventoryMovement");
+    const movementRepo = this._getRepo(qr, InventoryMovement);
 
     try {
-      // @ts-ignore
       const movement = await movementRepo.findOne({
         where: { id },
         relations: ["product", "sale"],
@@ -163,11 +180,9 @@ class InventoryMovementService {
         throw new Error(`Inventory movement with ID ${id} not found`);
       }
 
-      // @ts-ignore
       await auditLogger.logView("InventoryMovement", id, "system");
       return movement;
     } catch (error) {
-      // @ts-ignore
       console.error("Failed to find inventory movement:", error.message);
       throw error;
     }
@@ -176,110 +191,72 @@ class InventoryMovementService {
   /**
    * Find all movements with optional filters
    * @param {Object} options - Filter options
+   * @param {import("typeorm").QueryRunner | null} qr - Optional transaction query runner
    */
-  async findAll(options = {}) {
-    const { movement: movementRepo } = await this.getRepositories();
+  async findAll(options = {}, qr = null) {
+    const InventoryMovement = require("../entities/InventoryMovement");
+    const movementRepo = this._getRepo(qr, InventoryMovement);
 
     try {
-      // @ts-ignore
       const queryBuilder = movementRepo
         .createQueryBuilder("movement")
         .leftJoinAndSelect("movement.product", "product")
         .leftJoinAndSelect("movement.sale", "sale");
 
-      // Filter by product
-
-      // @ts-ignore
       if (options.productId) {
         queryBuilder.andWhere("movement.productId = :productId", {
-          // @ts-ignore
           productId: options.productId,
         });
       }
 
-      // Filter by sale
-
-      // @ts-ignore
       if (options.saleId) {
         queryBuilder.andWhere("movement.saleId = :saleId", {
-          // @ts-ignore
           saleId: options.saleId,
         });
       }
 
-      // Filter by movement type
-
-      // @ts-ignore
       if (options.movementType) {
         queryBuilder.andWhere("movement.movementType = :movementType", {
-          // @ts-ignore
           movementType: options.movementType,
         });
       }
 
-      // @ts-ignore
       if (options.movementTypes && options.movementTypes.length) {
         queryBuilder.andWhere("movement.movementType IN (:...movementTypes)", {
-          // @ts-ignore
           movementTypes: options.movementTypes,
         });
       }
 
-      // Filter by date range
-
-      // @ts-ignore
       if (options.startDate) {
         queryBuilder.andWhere("movement.timestamp >= :startDate", {
-          // @ts-ignore
           startDate: options.startDate,
         });
       }
 
-      // @ts-ignore
       if (options.endDate) {
         queryBuilder.andWhere("movement.timestamp <= :endDate", {
-          // @ts-ignore
           endDate: options.endDate,
         });
       }
 
-      // Filter by direction (increase/decrease)
-
-      // @ts-ignore
       if (options.direction === "increase") {
         queryBuilder.andWhere("movement.qtyChange > 0");
-      // @ts-ignore
       } else if (options.direction === "decrease") {
         queryBuilder.andWhere("movement.qtyChange < 0");
       }
 
-      // Search in notes
-
-      // @ts-ignore
       if (options.search) {
         queryBuilder.andWhere("movement.notes LIKE :search", {
-          // @ts-ignore
           search: `%${options.search}%`,
         });
       }
 
-      // Sorting
-
-      // @ts-ignore
       const sortBy = options.sortBy || "timestamp";
-
-      // @ts-ignore
       const sortOrder = options.sortOrder === "ASC" ? "ASC" : "DESC";
       queryBuilder.orderBy(`movement.${sortBy}`, sortOrder);
 
-      // Pagination
-
-      // @ts-ignore
       if (options.page && options.limit) {
-        // @ts-ignore
         const offset = (options.page - 1) * options.limit;
-
-        // @ts-ignore
         queryBuilder.skip(offset).take(options.limit);
       }
 
@@ -295,14 +272,13 @@ class InventoryMovementService {
 
   /**
    * Get inventory movement statistics
+   * @param {import("typeorm").QueryRunner | null} qr
    */
-  async getStatistics() {
-    const { movement: movementRepo } = await this.getRepositories();
+  async getStatistics(qr = null) {
+    const InventoryMovement = require("../entities/InventoryMovement");
+    const movementRepo = this._getRepo(qr, InventoryMovement);
 
     try {
-      // Total quantity changes by type
-
-      // @ts-ignore
       const byType = await movementRepo
         .createQueryBuilder("movement")
         .select("movement.movementType", "type")
@@ -311,25 +287,18 @@ class InventoryMovementService {
         .groupBy("movement.movementType")
         .getRawMany();
 
-      // Total increases and decreases
-
-      // @ts-ignore
       const totalIncrease = await movementRepo
         .createQueryBuilder("movement")
         .select("SUM(movement.qtyChange)", "total")
         .where("movement.qtyChange > 0")
         .getRawOne();
 
-      // @ts-ignore
       const totalDecrease = await movementRepo
         .createQueryBuilder("movement")
         .select("SUM(ABS(movement.qtyChange))", "total")
         .where("movement.qtyChange < 0")
         .getRawOne();
 
-      // Movements per product (top 5)
-
-      // @ts-ignore
       const topProducts = await movementRepo
         .createQueryBuilder("movement")
         .select("movement.productId", "productId")
@@ -340,9 +309,7 @@ class InventoryMovementService {
         .limit(5)
         .getRawMany();
 
-      // Monthly trends
-
-      // @ts-ignore
+      // Monthly trends (SQLite syntax, adjust for other DBs if needed)
       const monthly = await movementRepo
         .createQueryBuilder("movement")
         .select([
@@ -376,10 +343,16 @@ class InventoryMovementService {
    * @param {string} format - 'csv' or 'json'
    * @param {Object} filters - Export filters (same as findAll)
    * @param {string} user
+   * @param {import("typeorm").QueryRunner | null} qr
    */
-  async exportMovements(format = "json", filters = {}, user = "system") {
+  async exportMovements(
+    format = "json",
+    filters = {},
+    user = "system",
+    qr = null
+  ) {
     try {
-      const movements = await this.findAll(filters);
+      const movements = await this.findAll(filters, qr);
 
       let exportData;
       if (format === "csv") {
@@ -396,48 +369,60 @@ class InventoryMovementService {
         ];
         const rows = movements.map((m) => [
           m.id,
-
-          // @ts-ignore
           m.product?.name || "N/A",
-
-          // @ts-ignore
           m.product?.sku || "N/A",
           m.movementType,
           m.qtyChange,
-
-          // @ts-ignore
           m.qtyChange > 0 ? "Increase" : m.qtyChange < 0 ? "Decrease" : "Zero",
-
-          // @ts-ignore
           m.sale?.id || "",
           m.notes || "",
-
-          // @ts-ignore
           new Date(m.timestamp).toLocaleString(),
         ]);
         exportData = {
           format: "csv",
           data: [headers, ...rows].map((row) => row.join(",")).join("\n"),
-          filename: `inventory_movements_export_${new Date().toISOString().split("T")[0]}.csv`,
+          filename: `inventory_movements_export_${
+            new Date().toISOString().split("T")[0]
+          }.csv`,
         };
       } else {
         exportData = {
           format: "json",
           data: movements,
-          filename: `inventory_movements_export_${new Date().toISOString().split("T")[0]}.json`,
+          filename: `inventory_movements_export_${
+            new Date().toISOString().split("T")[0]
+          }.json`,
         };
       }
 
-      // @ts-ignore
       await auditLogger.logExport("InventoryMovement", format, filters, user);
       console.log(
-        `Exported ${movements.length} inventory movements in ${format} format`,
+        `Exported ${movements.length} inventory movements in ${format} format`
       );
       return exportData;
     } catch (error) {
       console.error("Failed to export inventory movements:", error);
       throw error;
     }
+  }
+
+  /**
+   * Bulk create inventory adjustments
+   * @param {Array<Object>} adjustmentsArray
+   * @param {string} user
+   * @param {import("typeorm").QueryRunner | null} qr
+   */
+  async bulkCreateAdjustments(adjustmentsArray, user = "system", qr = null) {
+    const results = { created: [], errors: [] };
+    for (const adjData of adjustmentsArray) {
+      try {
+        const saved = await this.createAdjustment(adjData, user, qr);
+        results.created.push(saved);
+      } catch (err) {
+        results.errors.push({ adjustment: adjData, error: err.message });
+      }
+    }
+    return results;
   }
 }
 

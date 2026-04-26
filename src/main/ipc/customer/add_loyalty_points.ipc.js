@@ -1,5 +1,3 @@
-//@ts-check
-
 const customerService = require("../../../services/Customer");
 
 /**
@@ -9,13 +7,13 @@ const customerService = require("../../../services/Customer");
  * @param {number} params.points - Points to add (positive)
  * @param {string} [params.notes] - Reason
  * @param {number} [params.saleId] - Associated sale ID
- * @param {string} [params.userId] - User
- * @param {import("typeorm").QueryRunner} [queryRunner] - Transaction runner
+ * @param {string} [params.user] - User
+ * @param {import("typeorm").QueryRunner} queryRunner - Transaction runner
  * @returns {Promise<{status: boolean, message: string, data: any}>}
  */
 module.exports = async (params, queryRunner) => {
   try {
-    const { id, points, notes, saleId, userId = "system" } = params;
+    const { id, points, notes, saleId, user = "system" } = params;
 
     if (!id || isNaN(id)) {
       throw new Error("Valid customer ID is required");
@@ -27,10 +25,10 @@ module.exports = async (params, queryRunner) => {
     const result = await customerService.addLoyaltyPoints(
       Number(id),
       Number(points),
-      // @ts-ignore
       notes || null,
       saleId ? Number(saleId) : null,
-      userId,
+      user,
+      queryRunner
     );
 
     return {
@@ -42,7 +40,6 @@ module.exports = async (params, queryRunner) => {
     console.error("Error in addLoyaltyPoints:", error);
     return {
       status: false,
-      // @ts-ignore
       message: error.message || "Failed to add loyalty points",
       data: null,
     };

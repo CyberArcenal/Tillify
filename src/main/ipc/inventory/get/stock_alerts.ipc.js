@@ -1,7 +1,7 @@
 // src/main/ipc/inventory/get/stock_alerts.ipc.js
-//@ts-check
-const { AppDataSource } = require("../../../db/datasource");
-const Product = require("../../../../entities/Product");
+
+
+const productService = require("../../../../services/Product");
 
 /**
  * Get products with low stock (below threshold).
@@ -13,18 +13,7 @@ const Product = require("../../../../entities/Product");
 module.exports = async (params, queryRunner) => {
   try {
     const threshold = params.threshold || 5;
-
-    const repo = queryRunner
-      ? queryRunner.manager.getRepository(Product)
-      : AppDataSource.getRepository(Product);
-
-    const lowStockProducts = await repo
-      .createQueryBuilder("product")
-      .where("product.stockQty <= :threshold", { threshold })
-      .andWhere("product.isActive = :active", { active: true })
-      .orderBy("product.stockQty", "ASC")
-      .getMany();
-
+    const lowStockProducts = await productService.getLowStock(threshold);
     return {
       status: true,
       message: "Stock alerts retrieved",

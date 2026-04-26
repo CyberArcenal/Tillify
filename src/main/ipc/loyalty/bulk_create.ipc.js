@@ -1,7 +1,7 @@
 // src/main/ipc/loyalty/bulk_create.ipc.js
-//@ts-check
-const auditLogger = require("../../../utils/auditLogger");
-const { validateLoyaltyTransaction } = require("../../../utils/loyaltyUtils");
+
+
+const loyaltyTransactionService = require("../../../services/LoyaltyTransaction");
 
 /**
  * Bulk create multiple loyalty transactions
@@ -13,107 +13,20 @@ const { validateLoyaltyTransaction } = require("../../../utils/loyaltyUtils");
  */
 module.exports = async (params, queryRunner) => {
   try {
-    if (!params.transactions || !Array.isArray(params.transactions) || params.transactions.length === 0) {
+    const { transactions, user = 'system' } = params;
+    if (!transactions || !Array.isArray(transactions) || transactions.length === 0) {
       return { status: false, message: 'transactions array is required and cannot be empty', data: null };
     }
 
-    const customerRepo = queryRunner.manager.getRepository('Customer');
-    const saleRepo = queryRunner.manager.getRepository('Sale');
-    const txRepo = queryRunner.manager.getRepository('LoyaltyTransaction');
+    const result = await loyaltyTransactionService.bulkCreate(transactions, user, queryRunner);
 
-    const results = [];
-    const errors = [];
-
-    for (const [index, item] of params.transactions.entries()) {
-      try {
-        // Validate each item
-        if (!item.customerId) throw new Error(`Item ${index}: customerId is required`);
-        if (item.pointsChange === undefined || item.pointsChange === 0) {
-          throw new Error(`Item ${index}: pointsChange must be non-zero`);
-        }
-
-        const validation = validateLoyaltyTransaction(item);
-        if (!validation.valid) {
-          throw new Error(`Item ${index}: ${validation.errors.join(', ')}`);
-        }
-
-        // Fetch customer
-        const customer = await customerRepo.findOne({ where: { id: item.customerId } });
-        if (!customer) {
-          throw new Error(`Item ${index}: Customer with ID ${item.customerId} not found`);
-        }
-
-        // Check balance if redeeming
-        if (item.pointsChange < 0 && customer.loyaltyPointsBalance + item.pointsChange < 0) {
-          throw new Error(
-            `Item ${index}: Insufficient points for customer ${customer.id}. Available: ${customer.loyaltyPointsBalance}, Requested: ${-item.pointsChange}`
-          );
-        }
-
-        // Fetch sale if provided
-        let sale = null;
-        if (item.saleId) {
-          sale = await saleRepo.findOne({ where: { id: item.saleId } });
-          if (!sale) {
-            throw new Error(`Item ${index}: Sale with ID ${item.saleId} not found`);
-          }
-        }
-
-        // Update customer balance
-        const oldBalance = customer.loyaltyPointsBalance;
-        customer.loyaltyPointsBalance += item.pointsChange;
-        customer.updatedAt = new Date();
-        const updatedCustomer = await customerRepo.save(customer);
-
-        // Create transaction
-        const transaction = txRepo.create({
-          pointsChange: item.pointsChange,
-          notes: item.notes || null,
-          customer: updatedCustomer,
-          sale: sale,
-          timestamp: new Date(),
-        });
-        const savedTx = await txRepo.save(transaction);
-
-        // Audit logs
-        await auditLogger.logUpdate(
-          'Customer',
-          customer.id,
-          { loyaltyPointsBalance: oldBalance },
-          { loyaltyPointsBalance: updatedCustomer.loyaltyPointsBalance },
-          params.user || 'system',
-          queryRunner.manager
-        );
-        await auditLogger.logCreate(
-          'LoyaltyTransaction',
-          savedTx.id,
-          savedTx,
-          params.user || 'system',
-          queryRunner.manager
-        );
-
-        results.push(savedTx);
-      } catch (err) {
-        errors.push({ index, error: err.message });
-        // Optionally break or continue? We'll continue and collect errors.
-      }
-    }
-
-    if (errors.length > 0) {
-      return {
-        status: false,
-        message: 'Some transactions failed',
-        data: {
-          successful: results,
-          errors,
-        },
-      };
-    }
-
+    const success = result.errors.length === 0;
     return {
-      status: true,
-      data: results,
-      message: `Successfully created ${results.length} transactions`,
+      status: success,
+      data: result,
+      message: success
+        ? `Successfully created ${result.created.length} transactions`
+        : `Created ${result.created.length} transactions with ${result.errors.length} errors`,
     };
   } catch (error) {
     console.error('Error in bulkCreateLoyaltyTransactions:', error);

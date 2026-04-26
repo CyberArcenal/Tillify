@@ -1,5 +1,5 @@
 // src/main/ipc/purchase/update.ipc.js
-// @ts-check
+
 
 const purchaseService = require('../../../services/PurchaseService');
 
@@ -24,7 +24,7 @@ module.exports = async (params, queryRunner) => {
       };
     }
 
-    const updatedPurchase = await purchaseService.update(id, updateData, user);
+    const updatedPurchase = await purchaseService.update(id, updateData, user, queryRunner);
     return {
       status: true,
       message: "Purchase updated successfully",

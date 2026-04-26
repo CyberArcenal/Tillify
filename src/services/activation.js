@@ -1,5 +1,5 @@
 // src/main/license/licenseService.js
-//@ts-check
+
 
 const LicenseCache = require("../entities/LicenseCache");
 const crypto = require("crypto");

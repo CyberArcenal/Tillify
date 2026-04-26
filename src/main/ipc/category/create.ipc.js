@@ -1,6 +1,5 @@
-// @ts-check
-const { AuditLog } = require("../../../entities/AuditLog");
-const { validateCategoryData } = require("../../../utils/categoryUtils");
+
+const categoryService = require("../../../services/CategoryService");
 
 /**
  * Create a new category (transactional)
@@ -20,41 +19,11 @@ module.exports = async (params, queryRunner) => {
   try {
     const { name, description, isActive = true, user = "system" } = params;
 
-    // Validate input
-    const validation = validateCategoryData({ name, description, isActive });
-    if (!validation.valid) {
-      throw new Error(validation.errors.join(", "));
-    }
-
-    const categoryRepo = queryRunner.manager.getRepository("Category");
-
-    // Check name uniqueness
-    const existing = await categoryRepo.findOne({ where: { name } });
-    if (existing) {
-      throw new Error(`Category with name "${name}" already exists`);
-    }
-
-    // Create entity
-    const newCategory = categoryRepo.create({
-      name,
-      description: description || null,
-      isActive,
-      createdAt: new Date(),
-    });
-
-    const savedCategory = await categoryRepo.save(newCategory);
-
-    // Audit log
-    const auditRepo = queryRunner.manager.getRepository(AuditLog);
-    const audit = auditRepo.create({
-      action: "CREATE",
-      entity: "Category",
-      entityId: savedCategory.id,
+    const savedCategory = await categoryService.create(
+      { name, description, isActive },
       user,
-      timestamp: new Date(),
-      description: `Category created: ${savedCategory.name}`,
-    });
-    await auditRepo.save(audit);
+      queryRunner
+    );
 
     return {
       status: true,

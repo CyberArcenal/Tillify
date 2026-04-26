@@ -1,4 +1,3 @@
-// @ts-check
 
 const returnRefundService = require('../../../../services/ReturnRefundService');
 
@@ -15,14 +14,12 @@ const returnRefundService = require('../../../../services/ReturnRefundService');
  * @param {'ASC'|'DESC'} [params.sortOrder='DESC'] - Sort order.
  * @param {number} [params.page] - Page number (1-indexed).
  * @param {number} [params.limit] - Items per page.
- * @param {import('typeorm').QueryRunner} [queryRunner] - Optional transaction runner.
+ * @param {import('typeorm').QueryRunner} queryRunner - Transaction runner (optional for reads).
  * @returns {Promise<{status: boolean, message: string, data: any}>}
  */
 module.exports = async (params, queryRunner) => {
   try {
-    // Optional: you can use queryRunner to get a transactional repository
-    // but for now we call the service directly.
-    const returns = await returnRefundService.findAll(params || {});
+    const returns = await returnRefundService.findAll(params || {}, queryRunner);
     return {
       status: true,
       message: "Returns fetched successfully",

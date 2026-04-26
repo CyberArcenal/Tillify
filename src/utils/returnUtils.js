@@ -1,5 +1,5 @@
 // utils/returnUtils.js
-// @ts-check
+
 
 /**
  * Validate return/refund data

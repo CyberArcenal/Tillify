@@ -1,8 +1,8 @@
 // src/main/ipc/loyalty/get/customer_summary.ipc.js
-//@ts-check
-const { AppDataSource } = require("../../../db/datasource");
-const Customer = require("../../../../entities/Customer");
-const LoyaltyTransaction = require("../../../../entities/LoyaltyTransaction");
+
+
+const customerService = require("../../../../services/Customer");
+const loyaltyTransactionService = require("../../../../services/LoyaltyTransaction");
 
 /**
  * Get loyalty summary for a specific customer
@@ -13,56 +13,43 @@ const LoyaltyTransaction = require("../../../../entities/LoyaltyTransaction");
 module.exports = async (params) => {
   try {
     if (!params.customerId) {
-      return {
-        status: false,
-        message: 'Missing required parameter: customerId',
-        data: null,
-      };
+      return { status: false, message: 'Missing required parameter: customerId', data: null };
     }
+    const customerId = Number(params.customerId);
 
-    const customerRepo = AppDataSource.getRepository(Customer);
-    const txRepo = AppDataSource.getRepository(LoyaltyTransaction);
-
-    const customer = await customerRepo.findOne({
-      where: { id: params.customerId },
-    });
-
+    const customer = await customerService.findById(customerId);
     if (!customer) {
-      return {
-        status: false,
-        message: `Customer with ID ${params.customerId} not found`,
-        data: null,
-      };
+      return { status: false, message: `Customer with ID ${customerId} not found`, data: null };
     }
 
-    // Recent transactions
-    const recentTransactions = await txRepo.find({
-      where: { customer: { id: params.customerId } },
-      relations: ['sale'],
-      order: { timestamp: 'DESC' },
-      take: 10,
+    // Recent transactions (last 10)
+    const recentTransactions = await loyaltyTransactionService.findAll({
+      customerId,
+      limit: 10,
+      sortBy: 'timestamp',
+      sortOrder: 'DESC',
     });
 
     // Points earned this month
     const startOfMonth = new Date();
     startOfMonth.setDate(1);
     startOfMonth.setHours(0, 0, 0, 0);
-    const earnedThisMonth = await txRepo
-      .createQueryBuilder('tx')
-      .select('SUM(tx.pointsChange)', 'total')
-      .where('tx.customerId = :customerId', { customerId: params.customerId })
-      .andWhere('tx.pointsChange > 0')
-      .andWhere('tx.timestamp >= :start', { start: startOfMonth })
-      .getRawOne();
+    const endOfMonth = new Date();
+    endOfMonth.setMonth(endOfMonth.getMonth() + 1);
+    endOfMonth.setDate(0);
+    endOfMonth.setHours(23, 59, 59, 999);
 
-    // Points redeemed this month
-    const redeemedThisMonth = await txRepo
-      .createQueryBuilder('tx')
-      .select('SUM(ABS(tx.pointsChange))', 'total')
-      .where('tx.customerId = :customerId', { customerId: params.customerId })
-      .andWhere('tx.pointsChange < 0')
-      .andWhere('tx.timestamp >= :start', { start: startOfMonth })
-      .getRawOne();
+    const allThisMonth = await loyaltyTransactionService.findAll({
+      customerId,
+      startDate: startOfMonth.toISOString(),
+      endDate: endOfMonth.toISOString(),
+    });
+    const earnedThisMonth = allThisMonth
+      .filter(tx => tx.pointsChange > 0)
+      .reduce((sum, tx) => sum + tx.pointsChange, 0);
+    const redeemedThisMonth = allThisMonth
+      .filter(tx => tx.pointsChange < 0)
+      .reduce((sum, tx) => sum + Math.abs(tx.pointsChange), 0);
 
     return {
       status: true,
@@ -73,8 +60,8 @@ module.exports = async (params) => {
           loyaltyPointsBalance: customer.loyaltyPointsBalance,
         },
         summary: {
-          earnedThisMonth: parseFloat(earnedThisMonth?.total) || 0,
-          redeemedThisMonth: parseFloat(redeemedThisMonth?.total) || 0,
+          earnedThisMonth,
+          redeemedThisMonth,
         },
         recentTransactions,
       },

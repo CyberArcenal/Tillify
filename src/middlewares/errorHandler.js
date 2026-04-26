@@ -1,5 +1,5 @@
 // src/utils/errorHandler.js
-//@ts-check
+
 
 const { safeStringify } = require("../utils/logger");
 

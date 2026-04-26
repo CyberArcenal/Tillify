@@ -1,5 +1,5 @@
 // src/subscribers/SaleSubscriber.js
-//@ts-check
+
 const Sale = require("../entities/Sale");
 const { AppDataSource } = require("../main/db/datasource");
 const { SaleStateTransitionService } = require("../StateTransitionServices/Sale");

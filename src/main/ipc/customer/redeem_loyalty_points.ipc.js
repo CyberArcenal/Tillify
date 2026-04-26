@@ -1,5 +1,3 @@
-//@ts-check
-
 const customerService = require("../../../services/Customer");
 
 /**
@@ -9,13 +7,13 @@ const customerService = require("../../../services/Customer");
  * @param {number} params.points - Points to redeem (positive)
  * @param {string} [params.notes] - Reason
  * @param {number} [params.saleId] - Associated sale ID
- * @param {string} [params.userId] - User
- * @param {import("typeorm").QueryRunner} [queryRunner] - Transaction runner
+ * @param {string} [params.user] - User
+ * @param {import("typeorm").QueryRunner} queryRunner - Transaction runner
  * @returns {Promise<{status: boolean, message: string, data: any}>}
  */
 module.exports = async (params, queryRunner) => {
   try {
-    const { id, points, notes, saleId, userId = "system" } = params;
+    const { id, points, notes, saleId, user = "system" } = params;
 
     if (!id || isNaN(id)) {
       throw new Error("Valid customer ID is required");
@@ -29,7 +27,8 @@ module.exports = async (params, queryRunner) => {
       Number(points),
       notes || null,
       saleId ? Number(saleId) : null,
-      userId,
+      user,
+      queryRunner
     );
 
     return {

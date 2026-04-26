@@ -1,5 +1,5 @@
 // src/main/ipc/product/get/by_barcode.ipc.js
-//@ts-check
+
 const { AppDataSource } = require("../../../db/datasource");
 const Product  = require("../../../../entities/Product");
 

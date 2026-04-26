@@ -1,22 +1,13 @@
 // services/PurchaseService.js
-// @ts-check
-
 const auditLogger = require("../utils/auditLogger");
-
 const { validatePurchaseData } = require("../utils/purchaseUtils");
 
 // 🔧 SETTINGS INTEGRATION: import needed settings getters
 const {
-  // Notification settings (for future use, but we don't implement notifications)
-  // @ts-ignore
-  emailEnabled,
-  // @ts-ignore
-  smsEnabled,
   getNotifySupplierOnConfirmedWithEmail,
   getNotifySupplierOnConfirmedWithSms,
   getNotifySupplierOnCompleteWithEmail,
   getNotifySupplierOnCompleteWithSms,
-  // Inventory settings
   inventorySyncEnabled,
 } = require("../utils/system");
 
@@ -63,51 +54,52 @@ class PurchaseService {
   }
 
   /**
+   * Helper: get a repository (transactional if queryRunner provided)
+   * @param {import("typeorm").QueryRunner | null} qr
+   * @param {Function} entityClass
+   * @returns {import("typeorm").Repository<any>}
+   */
+  _getRepo(qr, entityClass) {
+    if (qr) {
+      return qr.manager.getRepository(entityClass);
+    }
+    const { AppDataSource } = require("../main/db/datasource");
+    return AppDataSource.getRepository(entityClass);
+  }
+
+  /**
    * Create a new purchase with items
    * @param {Object} purchaseData - Purchase data including items
    * @param {string} user - User performing the action
+   * @param {import("typeorm").QueryRunner | null} qr - Optional transaction query runner
    */
-  async create(purchaseData, user = "system") {
-    // @ts-ignore
-    const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
-    const {
-      purchase: purchaseRepo,
-      supplier: supplierRepo,
-      product: productRepo,
-    } = await this.getRepositories();
+  async create(purchaseData, user = "system", qr = null) {
+    const { saveDb } = require("../utils/dbUtils/dbActions");
+    const Purchase = require("../entities/Purchase");
+    const Supplier = require("../entities/Supplier");
+    const Product = require("../entities/Product");
+
+    const purchaseRepo = this._getRepo(qr, Purchase);
+    const supplierRepo = this._getRepo(qr, Supplier);
+    const productRepo = this._getRepo(qr, Product);
 
     try {
-      // Validate purchase data
       const validation = validatePurchaseData(purchaseData);
       if (!validation.valid) {
         throw new Error(validation.errors.join(", "));
       }
 
       const {
-        // @ts-ignore
         referenceNo,
-
-        // @ts-ignore
         supplierId,
-
-        // @ts-ignore
         orderDate = new Date(),
-
-        // @ts-ignore
         status = "pending",
-
-        // @ts-ignore
         items = [],
-
-        // @ts-ignore
         notes,
       } = purchaseData;
 
       console.log(`Creating purchase: Reference ${referenceNo}`);
 
-      // Check supplier exists
-
-      // @ts-ignore
       const supplier = await supplierRepo.findOne({
         where: { id: supplierId },
       });
@@ -115,22 +107,18 @@ class PurchaseService {
         throw new Error(`Supplier with ID ${supplierId} not found`);
       }
 
-      // Check reference uniqueness if provided
       if (referenceNo) {
-        // @ts-ignore
         const existing = await purchaseRepo.findOne({ where: { referenceNo } });
         if (existing) {
           throw new Error(
-            `Purchase with reference "${referenceNo}" already exists`,
+            `Purchase with reference "${referenceNo}" already exists`
           );
         }
       }
 
-      // Prepare purchase items with calculated subtotals
       const purchaseItems = [];
       let totalAmount = 0;
       for (const item of items) {
-        // @ts-ignore
         const product = await productRepo.findOne({
           where: { id: item.productId },
         });
@@ -150,9 +138,6 @@ class PurchaseService {
         });
       }
 
-      // Create purchase entity
-
-      // @ts-ignore
       const purchase = purchaseRepo.create({
         referenceNo: referenceNo || generateReferenceNumber(),
         supplier,
@@ -164,34 +149,42 @@ class PurchaseService {
         purchaseItems,
       });
 
-      // Save purchase (cascade will save items)
-
-      // @ts-ignore
       const savedPurchase = await saveDb(purchaseRepo, purchase);
 
-      await auditLogger.logCreate(
-        "Purchase",
-        savedPurchase.id,
-        savedPurchase,
-        user,
-      );
+      // Audit log (if inside transaction, use qr.manager)
+      if (qr) {
+        const auditRepo = qr.manager.getRepository("AuditLog");
+        await auditRepo.save({
+          action: "CREATE",
+          entity: "Purchase",
+          entityId: savedPurchase.id,
+          user,
+          description: `Created purchase ${savedPurchase.referenceNo}`,
+        });
+      } else {
+        await auditLogger.logCreate(
+          "Purchase",
+          savedPurchase.id,
+          savedPurchase,
+          user
+        );
+      }
 
       console.log(
-        `Purchase created: #${savedPurchase.id} - ${savedPurchase.referenceNo}`,
+        `Purchase created: #${savedPurchase.id} - ${savedPurchase.referenceNo}`
       );
 
-      // 🔧 SETTINGS INTEGRATION: Log if notifications would be sent (but don't actually send)
+      // 🔧 SETTINGS INTEGRATION: Log if notifications would be sent
       if (status === "confirmed") {
         const emailNotif = await getNotifySupplierOnConfirmedWithEmail();
         const smsNotif = await getNotifySupplierOnConfirmedWithSms();
         console.log(
-          `[SETTINGS] Would send confirmed notifications: email=${emailNotif}, sms=${smsNotif}`,
+          `[SETTINGS] Would send confirmed notifications: email=${emailNotif}, sms=${smsNotif}`
         );
       }
 
       return savedPurchase;
     } catch (error) {
-      // @ts-ignore
       console.error("Failed to create purchase:", error.message);
       throw error;
     }
@@ -202,18 +195,19 @@ class PurchaseService {
    * @param {number} id - Purchase ID
    * @param {Object} purchaseData - Updated fields (items not allowed if completed)
    * @param {string} user - User performing the action
+   * @param {import("typeorm").QueryRunner | null} qr - Optional transaction query runner
    */
-  async update(id, purchaseData, user = "system") {
-    // @ts-ignore
-    const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
-    const {
-      purchase: purchaseRepo,
-      supplier: supplierRepo,
-      product: productRepo,
-    } = await this.getRepositories();
+  async update(id, purchaseData, user = "system", qr = null) {
+    const { updateDb } = require("../utils/dbUtils/dbActions");
+    const Purchase = require("../entities/Purchase");
+    const Supplier = require("../entities/Supplier");
+    const Product = require("../entities/Product");
+
+    const purchaseRepo = this._getRepo(qr, Purchase);
+    const supplierRepo = this._getRepo(qr, Supplier);
+    const productRepo = this._getRepo(qr, Product);
 
     try {
-      // @ts-ignore
       const existingPurchase = await purchaseRepo.findOne({
         where: { id },
         relations: ["supplier", "purchaseItems", "purchaseItems.product"],
@@ -222,7 +216,6 @@ class PurchaseService {
         throw new Error(`Purchase with ID ${id} not found`);
       }
 
-      // Prevent updates if purchase is already completed or cancelled
       if (existingPurchase.status === "completed") {
         throw new Error("Cannot update a completed purchase");
       }
@@ -235,61 +228,42 @@ class PurchaseService {
 
       // Handle supplier change
       if (
-        // @ts-ignore
         purchaseData.supplierId &&
-        // @ts-ignore
         purchaseData.supplierId !== existingPurchase.supplier.id
       ) {
-        // @ts-ignore
         const supplier = await supplierRepo.findOne({
-          // @ts-ignore
           where: { id: purchaseData.supplierId },
         });
         if (!supplier) {
           throw new Error(
-            // @ts-ignore
-            `Supplier with ID ${purchaseData.supplierId} not found`,
+            `Supplier with ID ${purchaseData.supplierId} not found`
           );
         }
-
-        // @ts-ignore
         existingPurchase.supplier = supplier;
       }
 
       // Handle reference change uniqueness
       if (
-        // @ts-ignore
         purchaseData.referenceNo &&
-        // @ts-ignore
         purchaseData.referenceNo !== existingPurchase.referenceNo
       ) {
-        // @ts-ignore
         const existing = await purchaseRepo.findOne({
-          // @ts-ignore
           where: { referenceNo: purchaseData.referenceNo },
         });
         if (existing) {
           throw new Error(
-            // @ts-ignore
-            `Purchase with reference "${purchaseData.referenceNo}" already exists`,
+            `Purchase with reference "${purchaseData.referenceNo}" already exists`
           );
         }
-
-        // @ts-ignore
         existingPurchase.referenceNo = purchaseData.referenceNo;
       }
 
-      // Handle items update if provided (only allowed for pending purchases)
-
-      // @ts-ignore
+      // Handle items update (only allowed for pending purchases)
       if (purchaseData.items) {
         if (existingPurchase.status !== "pending") {
           throw new Error("Can only update items for pending purchases");
         }
 
-        // Validate new items
-
-        // @ts-ignore
         const validation = validatePurchaseData({ items: purchaseData.items });
         if (!validation.valid) {
           throw new Error(validation.errors.join(", "));
@@ -297,21 +271,15 @@ class PurchaseService {
 
         // Remove old items
         if (
-          // @ts-ignore
           existingPurchase.purchaseItems &&
-          // @ts-ignore
           existingPurchase.purchaseItems.length > 0
         ) {
-          // @ts-ignore
           existingPurchase.purchaseItems = [];
         }
 
         const newItems = [];
         let totalAmount = 0;
-
-        // @ts-ignore
         for (const item of purchaseData.items) {
-          // @ts-ignore
           const product = await productRepo.findOne({
             where: { id: item.productId },
           });
@@ -331,29 +299,18 @@ class PurchaseService {
           });
         }
 
-        // @ts-ignore
         existingPurchase.purchaseItems = newItems;
         existingPurchase.totalAmount = totalAmount;
       }
 
-      // Update other fields
-
-      // @ts-ignore
       if (purchaseData.orderDate)
-        // @ts-ignore
         existingPurchase.orderDate = purchaseData.orderDate;
-
-      // @ts-ignore
       if (purchaseData.notes !== undefined)
-        // @ts-ignore
         existingPurchase.notes = purchaseData.notes;
 
       // Handle status change
-
-      // @ts-ignore
       const newStatus = purchaseData.status;
       if (newStatus && newStatus !== oldStatus) {
-        // Validate status transition
         if (oldStatus === "cancelled") {
           throw new Error("Cannot change status of cancelled purchase");
         }
@@ -361,49 +318,56 @@ class PurchaseService {
           throw new Error("Cannot revert completed purchase");
         }
 
-        // Update status
         existingPurchase.status = newStatus;
 
-        // 🔧 SETTINGS INTEGRATION: Log based on settings but don't perform new actions
         if (newStatus === "confirmed") {
           const emailNotif = await getNotifySupplierOnConfirmedWithEmail();
           const smsNotif = await getNotifySupplierOnConfirmedWithSms();
           console.log(
-            `[SETTINGS] Would send confirmed notifications: email=${emailNotif}, sms=${smsNotif}`,
+            `[SETTINGS] Would send confirmed notifications: email=${emailNotif}, sms=${smsNotif}`
           );
         }
 
         if (newStatus === "completed") {
-          // 🔧 SETTINGS INTEGRATION: Check if inventory sync is enabled (but don't actually sync)
           const syncEnabled = await inventorySyncEnabled();
           console.log(
-            // @ts-ignore
-            `[SETTINGS] Inventory sync enabled: ${syncEnabled}. Would update stock for ${existingPurchase.purchaseItems.length} items.`,
+            `[SETTINGS] Inventory sync enabled: ${syncEnabled}. Would update stock for ${existingPurchase.purchaseItems.length} items.`
           );
 
-          // Log completion notifications
           const emailNotif = await getNotifySupplierOnCompleteWithEmail();
           const smsNotif = await getNotifySupplierOnCompleteWithSms();
           console.log(
-            `[SETTINGS] Would send completed notifications: email=${emailNotif}, sms=${smsNotif}`,
+            `[SETTINGS] Would send completed notifications: email=${emailNotif}, sms=${smsNotif}`
           );
         }
       }
 
       existingPurchase.updatedAt = new Date();
-
-      // Save updated purchase
-
-      // @ts-ignore
       const savedPurchase = await updateDb(purchaseRepo, existingPurchase);
 
-      await auditLogger.logUpdate("Purchase", id, oldData, savedPurchase, user);
+      // Audit log
+      if (qr) {
+        const auditRepo = qr.manager.getRepository("AuditLog");
+        await auditRepo.save({
+          action: "UPDATE",
+          entity: "Purchase",
+          entityId: id,
+          user,
+          description: `Updated purchase #${id}`,
+        });
+      } else {
+        await auditLogger.logUpdate(
+          "Purchase",
+          id,
+          oldData,
+          savedPurchase,
+          user
+        );
+      }
 
       console.log(`Purchase updated: #${id}`);
-
       return savedPurchase;
     } catch (error) {
-      // @ts-ignore
       console.error("Failed to update purchase:", error.message);
       throw error;
     }
@@ -413,14 +377,14 @@ class PurchaseService {
    * Soft delete a purchase (set status to cancelled)
    * @param {number} id - Purchase ID
    * @param {string} user - User performing the action
+   * @param {import("typeorm").QueryRunner | null} qr - Optional transaction query runner
    */
-  async delete(id, user = "system") {
-    // @ts-ignore
-    const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
-    const { purchase: purchaseRepo } = await this.getRepositories();
+  async delete(id, user = "system", qr = null) {
+    const { updateDb } = require("../utils/dbUtils/dbActions");
+    const Purchase = require("../entities/Purchase");
+    const purchaseRepo = this._getRepo(qr, Purchase);
 
     try {
-      // @ts-ignore
       const purchase = await purchaseRepo.findOne({
         where: { id },
         relations: ["purchaseItems"],
@@ -437,29 +401,81 @@ class PurchaseService {
       purchase.status = "cancelled";
       purchase.updatedAt = new Date();
 
-      // @ts-ignore
       const savedPurchase = await updateDb(purchaseRepo, purchase);
 
-      await auditLogger.logDelete("Purchase", id, oldData, user);
+      if (qr) {
+        const auditRepo = qr.manager.getRepository("AuditLog");
+        await auditRepo.save({
+          action: "DELETE",
+          entity: "Purchase",
+          entityId: id,
+          user,
+          description: `Cancelled purchase #${id}`,
+        });
+      } else {
+        await auditLogger.logDelete("Purchase", id, oldData, user);
+      }
 
       console.log(`Purchase cancelled: #${id}`);
       return savedPurchase;
     } catch (error) {
-      // @ts-ignore
       console.error("Failed to delete purchase:", error.message);
       throw error;
     }
   }
 
   /**
+   * Hard delete a purchase – only allowed if not yet completed or if no inventory impact?
+   * @param {number} id - Purchase ID
+   * @param {string} user - User performing the action
+   * @param {import("typeorm").QueryRunner | null} qr - Optional transaction query runner
+   */
+  async permanentlyDelete(id, user = "system", qr = null) {
+    const { removeDb } = require("../utils/dbUtils/dbActions");
+    const Purchase = require("../entities/Purchase");
+    const purchaseRepo = this._getRepo(qr, Purchase);
+
+    const purchase = await purchaseRepo.findOne({
+      where: { id },
+      relations: ["purchaseItems"],
+    });
+    if (!purchase) {
+      throw new Error(`Purchase with ID ${id} not found`);
+    }
+
+    // Prevent hard delete if completed (because inventory may have been updated)
+    if (purchase.status === "completed") {
+      throw new Error("Cannot permanently delete a completed purchase");
+    }
+
+    await removeDb(purchaseRepo, purchase);
+
+    if (qr) {
+      const auditRepo = qr.manager.getRepository("AuditLog");
+      await auditRepo.save({
+        action: "DELETE",
+        entity: "Purchase",
+        entityId: id,
+        user,
+        description: `Permanently deleted purchase #${id}`,
+      });
+    } else {
+      await auditLogger.logDelete("Purchase", id, purchase, user);
+    }
+
+    console.log(`Purchase #${id} permanently deleted`);
+  }
+
+  /**
    * Find purchase by ID
    * @param {number} id
+   * @param {import("typeorm").QueryRunner | null} qr - Optional transaction query runner
    */
-  async findById(id) {
-    const { purchase: purchaseRepo } = await this.getRepositories();
+  async findById(id, qr = null) {
+    const Purchase = require("../entities/Purchase");
+    const purchaseRepo = this._getRepo(qr, Purchase);
 
     try {
-      // @ts-ignore
       const purchase = await purchaseRepo.findOne({
         where: { id },
         relations: ["supplier", "purchaseItems", "purchaseItems.product"],
@@ -468,11 +484,9 @@ class PurchaseService {
         throw new Error(`Purchase with ID ${id} not found`);
       }
 
-      // @ts-ignore
       await auditLogger.logView("Purchase", id, "system");
       return purchase;
     } catch (error) {
-      // @ts-ignore
       console.error("Failed to find purchase:", error.message);
       throw error;
     }
@@ -481,83 +495,55 @@ class PurchaseService {
   /**
    * Find all purchases with optional filters
    * @param {Object} options - Filter options
+   * @param {import("typeorm").QueryRunner | null} qr - Optional transaction query runner
    */
-  async findAll(options = {}) {
-    const { purchase: purchaseRepo } = await this.getRepositories();
+  async findAll(options = {}, qr = null) {
+    const Purchase = require("../entities/Purchase");
+    const purchaseRepo = this._getRepo(qr, Purchase);
 
     try {
-      // @ts-ignore
       const queryBuilder = purchaseRepo
         .createQueryBuilder("purchase")
         .leftJoinAndSelect("purchase.supplier", "supplier")
         .leftJoinAndSelect("purchase.purchaseItems", "purchaseItems")
         .leftJoinAndSelect("purchaseItems.product", "product");
 
-      // Filter by status
-
-      // @ts-ignore
       if (options.status) {
         queryBuilder.andWhere("purchase.status = :status", {
-          // @ts-ignore
           status: options.status,
         });
       }
 
-      // Filter by supplier
-
-      // @ts-ignore
       if (options.supplierId) {
         queryBuilder.andWhere("supplier.id = :supplierId", {
-          // @ts-ignore
           supplierId: options.supplierId,
         });
       }
 
-      // Date range
-
-      // @ts-ignore
       if (options.startDate) {
         queryBuilder.andWhere("purchase.orderDate >= :startDate", {
-          // @ts-ignore
           startDate: options.startDate,
         });
       }
 
-      // @ts-ignore
       if (options.endDate) {
         queryBuilder.andWhere("purchase.orderDate <= :endDate", {
-          // @ts-ignore
           endDate: options.endDate,
         });
       }
 
-      // Search by reference
-
-      // @ts-ignore
       if (options.search) {
         queryBuilder.andWhere("purchase.referenceNo LIKE :search", {
-          // @ts-ignore
           search: `%${options.search}%`,
         });
       }
 
-      // Sorting
-
-      // @ts-ignore
       const sortBy = options.sortBy || "orderDate";
-
-      // @ts-ignore
       const sortOrder = options.sortOrder === "ASC" ? "ASC" : "DESC";
       queryBuilder.orderBy(`purchase.${sortBy}`, sortOrder);
 
-      // Pagination
-
-      // @ts-ignore
       if (options.page && options.limit) {
-        // @ts-ignore
         const offset = (options.page - 1) * options.limit;
-
-        // @ts-ignore
         queryBuilder.skip(offset).take(options.limit);
       }
 
@@ -573,14 +559,13 @@ class PurchaseService {
 
   /**
    * Get purchase statistics
+   * @param {import("typeorm").QueryRunner | null} qr
    */
-  async getStatistics() {
-    const { purchase: purchaseRepo } = await this.getRepositories();
+  async getStatistics(qr = null) {
+    const Purchase = require("../entities/Purchase");
+    const purchaseRepo = this._getRepo(qr, Purchase);
 
     try {
-      // Count by status
-
-      // @ts-ignore
       const statusCounts = await purchaseRepo
         .createQueryBuilder("purchase")
         .select("purchase.status", "status")
@@ -588,27 +573,18 @@ class PurchaseService {
         .groupBy("purchase.status")
         .getRawMany();
 
-      // Total purchase amount for completed purchases
-
-      // @ts-ignore
       const totalCompleted = await purchaseRepo
         .createQueryBuilder("purchase")
         .select("SUM(purchase.totalAmount)", "total")
         .where("purchase.status = :status", { status: "completed" })
         .getRawOne();
 
-      // Average purchase amount
-
-      // @ts-ignore
       const avgAmount = await purchaseRepo
         .createQueryBuilder("purchase")
         .select("AVG(purchase.totalAmount)", "average")
         .where("purchase.status = :status", { status: "completed" })
         .getRawOne();
 
-      // Purchase count by supplier (top 5)
-
-      // @ts-ignore
       const topSuppliers = await purchaseRepo
         .createQueryBuilder("purchase")
         .leftJoin("purchase.supplier", "supplier")
@@ -639,10 +615,16 @@ class PurchaseService {
    * @param {string} format - 'csv' or 'json'
    * @param {Object} filters - Export filters
    * @param {string} user
+   * @param {import("typeorm").QueryRunner | null} qr
    */
-  async exportPurchases(format = "json", filters = {}, user = "system") {
+  async exportPurchases(
+    format = "json",
+    filters = {},
+    user = "system",
+    qr = null
+  ) {
     try {
-      const purchases = await this.findAll(filters);
+      const purchases = await this.findAll(filters, qr);
 
       let exportData;
       if (format === "csv") {
@@ -659,35 +641,30 @@ class PurchaseService {
         const rows = purchases.map((p) => [
           p.id,
           p.referenceNo || "",
-
-          // @ts-ignore
           p.supplier?.name || "",
-
-          // @ts-ignore
           new Date(p.orderDate).toLocaleDateString(),
           p.status,
           p.totalAmount,
-
-          // @ts-ignore
           p.notes || "",
-
-          // @ts-ignore
           new Date(p.createdAt).toLocaleDateString(),
         ]);
         exportData = {
           format: "csv",
           data: [headers, ...rows].map((row) => row.join(",")).join("\n"),
-          filename: `purchases_export_${new Date().toISOString().split("T")[0]}.csv`,
+          filename: `purchases_export_${
+            new Date().toISOString().split("T")[0]
+          }.csv`,
         };
       } else {
         exportData = {
           format: "json",
           data: purchases,
-          filename: `purchases_export_${new Date().toISOString().split("T")[0]}.json`,
+          filename: `purchases_export_${
+            new Date().toISOString().split("T")[0]
+          }.json`,
         };
       }
 
-      // @ts-ignore
       await auditLogger.logExport("Purchase", format, filters, user);
       console.log(`Exported ${purchases.length} purchases in ${format} format`);
       return exportData;
@@ -695,6 +672,87 @@ class PurchaseService {
       console.error("Failed to export purchases:", error);
       throw error;
     }
+  }
+
+  /**
+   * Bulk create multiple purchases
+   * @param {Array<Object>} purchasesArray
+   * @param {string} user
+   * @param {import("typeorm").QueryRunner | null} qr
+   */
+  async bulkCreate(purchasesArray, user = "system", qr = null) {
+    const results = { created: [], errors: [] };
+    for (const purchaseData of purchasesArray) {
+      try {
+        const saved = await this.create(purchaseData, user, qr);
+        results.created.push(saved);
+      } catch (err) {
+        results.errors.push({ purchase: purchaseData, error: err.message });
+      }
+    }
+    return results;
+  }
+
+  /**
+   * Bulk update multiple purchases
+   * @param {Array<{ id: number, updates: Object }>} updatesArray
+   * @param {string} user
+   * @param {import("typeorm").QueryRunner | null} qr
+   */
+  async bulkUpdate(updatesArray, user = "system", qr = null) {
+    const results = { updated: [], errors: [] };
+    for (const { id, updates } of updatesArray) {
+      try {
+        const saved = await this.update(id, updates, user, qr);
+        results.updated.push(saved);
+      } catch (err) {
+        results.errors.push({ id, updates, error: err.message });
+      }
+    }
+    return results;
+  }
+
+  /**
+   * Import purchases from a CSV file
+   * @param {string} filePath
+   * @param {string} user
+   * @param {import("typeorm").QueryRunner | null} qr
+   */
+  async importFromCSV(filePath, user = "system", qr = null) {
+    const fs = require("fs").promises;
+    const csv = require("csv-parse/sync");
+    const fileContent = await fs.readFile(filePath, "utf-8");
+    const records = csv.parse(fileContent, {
+      columns: true,
+      skip_empty_lines: true,
+      trim: true,
+    });
+
+    const results = { imported: [], errors: [] };
+    for (const record of records) {
+      try {
+        // Parse items from a JSON string in CSV (e.g., "[{\"productId\":1,\"quantity\":10,\"unitPrice\":5.00}]")
+        let items = [];
+        if (record.items) {
+          items = JSON.parse(record.items);
+        }
+        const purchaseData = {
+          referenceNo: record.referenceNo || undefined,
+          supplierId: parseInt(record.supplierId, 10),
+          orderDate: record.orderDate ? new Date(record.orderDate) : new Date(),
+          status: record.status || "pending",
+          items: items,
+          notes: record.notes || null,
+        };
+        const validation = validatePurchaseData(purchaseData);
+        if (!validation.valid) throw new Error(validation.errors.join(", "));
+        const saved = await this.create(purchaseData, user, qr);
+        results.imported.push(saved);
+      } catch (err) {
+        results.errors.push({ row: record, error: err.message });
+      }
+    }
+    return results;
   }
 }
 

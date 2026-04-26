@@ -1,7 +1,7 @@
 // src/main/ipc/loyalty/create.ipc.js
-//@ts-check
-const { validateLoyaltyTransaction } = require("../../../utils/loyaltyUtils");
-const auditLogger = require("../../../utils/auditLogger");
+
+
+const loyaltyTransactionService = require("../../../services/LoyaltyTransaction");
 
 /**
  * Create a manual loyalty transaction (adjustment)
@@ -16,7 +16,6 @@ const auditLogger = require("../../../utils/auditLogger");
  */
 module.exports = async (params, queryRunner) => {
   try {
-    // Validate input
     if (!params.customerId) {
       return { status: false, message: 'customerId is required', data: null };
     }
@@ -24,71 +23,13 @@ module.exports = async (params, queryRunner) => {
       return { status: false, message: 'pointsChange must be non-zero', data: null };
     }
 
-    const validation = validateLoyaltyTransaction(params);
-    if (!validation.valid) {
-      return { status: false, message: validation.errors.join(', '), data: null };
-    }
-
-    const customerRepo = queryRunner.manager.getRepository('Customer');
-    const saleRepo = queryRunner.manager.getRepository('Sale');
-    const txRepo = queryRunner.manager.getRepository('LoyaltyTransaction');
-
-    // Fetch customer
-    const customer = await customerRepo.findOne({ where: { id: params.customerId } });
-    if (!customer) {
-      return { status: false, message: `Customer with ID ${params.customerId} not found`, data: null };
-    }
-
-    // Check balance if redeeming
-    if (params.pointsChange < 0 && customer.loyaltyPointsBalance + params.pointsChange < 0) {
-      return {
-        status: false,
-        message: `Insufficient points. Available: ${customer.loyaltyPointsBalance}, Requested: ${-params.pointsChange}`,
-        data: null,
-      };
-    }
-
-    // Fetch sale if provided
-    let sale = null;
-    if (params.saleId) {
-      sale = await saleRepo.findOne({ where: { id: params.saleId } });
-      if (!sale) {
-        return { status: false, message: `Sale with ID ${params.saleId} not found`, data: null };
-      }
-    }
-
-    // Update customer balance
-    const oldBalance = customer.loyaltyPointsBalance;
-    customer.loyaltyPointsBalance += params.pointsChange;
-    customer.updatedAt = new Date();
-    const updatedCustomer = await customerRepo.save(customer);
-
-    // Create transaction record
-    const transaction = txRepo.create({
+    const data = {
+      customerId: params.customerId,
       pointsChange: params.pointsChange,
-      notes: params.notes || null,
-      customer: updatedCustomer,
-      sale: sale,
-      timestamp: new Date(),
-    });
-    const savedTx = await txRepo.save(transaction);
-
-    // Audit logs (using queryRunner to keep within transaction)
-    await auditLogger.logUpdate(
-      'Customer',
-      customer.id,
-      { loyaltyPointsBalance: oldBalance },
-      { loyaltyPointsBalance: updatedCustomer.loyaltyPointsBalance },
-      params.user || 'system',
-      queryRunner.manager
-    );
-    await auditLogger.logCreate(
-      'LoyaltyTransaction',
-      savedTx.id,
-      savedTx,
-      params.user || 'system',
-      queryRunner.manager
-    );
+      notes: params.notes,
+      saleId: params.saleId,
+    };
+    const savedTx = await loyaltyTransactionService.createManual(data, params.user || 'system', queryRunner);
 
     return {
       status: true,

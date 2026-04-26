@@ -1,7 +1,7 @@
 // src/main/ipc/inventory/get/all.ipc.js
-//@ts-check
-const { AppDataSource } = require("../../../db/datasource");
-const InventoryMovement = require("../../../../entities/InventoryMovement");
+
+
+const inventoryMovementService = require("../../../../services/InventoryMovement");
 
 /**
  * Get all inventory movements with optional filtering and pagination.
@@ -23,56 +23,24 @@ const InventoryMovement = require("../../../../entities/InventoryMovement");
  */
 module.exports = async (params, queryRunner) => {
   try {
-    const repo = queryRunner
-      ? queryRunner.manager.getRepository(InventoryMovement)
-      : AppDataSource.getRepository(InventoryMovement);
+    const filters = {
+      page: params.page,
+      limit: params.limit,
+      sortBy: params.sortBy,
+      sortOrder: params.sortOrder,
+      productId: params.productId,
+      saleId: params.saleId,
+      movementType: params.movementType,
+      movementTypes: params.movementTypes,
+      startDate: params.startDate,
+      endDate: params.endDate,
+      direction: params.direction,
+      search: params.search,
+    };
+    // Remove undefined keys
+    Object.keys(filters).forEach((key) => filters[key] === undefined && delete filters[key]);
 
-    const queryBuilder = repo
-      .createQueryBuilder("movement")
-      .leftJoinAndSelect("movement.product", "product")
-      .leftJoinAndSelect("movement.sale", "sale");
-
-    // Apply filters
-    if (params.productId) {
-      queryBuilder.andWhere("movement.productId = :productId", { productId: params.productId });
-    }
-    if (params.saleId) {
-      queryBuilder.andWhere("movement.saleId = :saleId", { saleId: params.saleId });
-    }
-    if (params.movementType) {
-      queryBuilder.andWhere("movement.movementType = :movementType", { movementType: params.movementType });
-    }
-    if (params.movementTypes?.length) {
-      queryBuilder.andWhere("movement.movementType IN (:...movementTypes)", { movementTypes: params.movementTypes });
-    }
-    if (params.startDate) {
-      queryBuilder.andWhere("movement.timestamp >= :startDate", { startDate: params.startDate });
-    }
-    if (params.endDate) {
-      queryBuilder.andWhere("movement.timestamp <= :endDate", { endDate: params.endDate });
-    }
-    if (params.direction === "increase") {
-      queryBuilder.andWhere("movement.qtyChange > 0");
-    } else if (params.direction === "decrease") {
-      queryBuilder.andWhere("movement.qtyChange < 0");
-    }
-    if (params.search) {
-      queryBuilder.andWhere("movement.notes LIKE :search", { search: `%${params.search}%` });
-    }
-
-    // Sorting
-    const sortBy = params.sortBy || "timestamp";
-    const sortOrder = params.sortOrder === "ASC" ? "ASC" : "DESC";
-    queryBuilder.orderBy(`movement.${sortBy}`, sortOrder);
-
-    // Pagination
-    if (params.page && params.limit) {
-      const offset = (params.page - 1) * params.limit;
-      queryBuilder.skip(offset).take(params.limit);
-    }
-
-    const movements = await queryBuilder.getMany();
-
+    const movements = await inventoryMovementService.findAll(filters, queryRunner);
     return {
       status: true,
       message: "Inventory movements retrieved successfully",

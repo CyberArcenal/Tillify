@@ -1,4 +1,4 @@
-//@ts-check
+
 const SaleItem = require("../../../../entities/SaleItem");
 const { AppDataSource } = require("../../../db/datasource");
 

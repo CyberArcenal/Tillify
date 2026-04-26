@@ -1,9 +1,5 @@
 // services/SupplierService.js
-// @ts-check
-
 const auditLogger = require("../utils/auditLogger");
-// @ts-ignore
-
 const { validateSupplierData } = require("../utils/supplierUtils");
 
 class SupplierService {
@@ -36,47 +32,52 @@ class SupplierService {
   }
 
   /**
+   * Helper: get a repository (transactional if queryRunner provided)
+   * @param {import("typeorm").QueryRunner | null} qr
+   * @param {Function} entityClass
+   * @returns {import("typeorm").Repository<any>}
+   */
+  _getRepo(qr, entityClass) {
+    if (qr) {
+      return qr.manager.getRepository(entityClass);
+    }
+    const { AppDataSource } = require("../main/db/datasource");
+    return AppDataSource.getRepository(entityClass);
+  }
+
+  /**
    * Create a new supplier
    * @param {Object} supplierData - Supplier data
    * @param {string} user - User performing the action
+   * @param {import("typeorm").QueryRunner | null} qr - Optional transaction query runner
    */
-  async create(supplierData, user = "system") {
-    const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
-    const { supplier: supplierRepo } = await this.getRepositories();
+  async create(supplierData, user = "system", qr = null) {
+    const { saveDb } = require("../utils/dbUtils/dbActions");
+    const Supplier = require("../entities/Supplier");
+    const supplierRepo = this._getRepo(qr, Supplier);
 
     try {
-      // Validate supplier data
       const validation = validateSupplierData(supplierData);
       if (!validation.valid) {
         throw new Error(validation.errors.join(", "));
       }
 
       const {
-        // @ts-ignore
         name,
-        // @ts-ignore
         contactInfo = null,
-        // @ts-ignore
         email = null,
-        // @ts-ignore
         phone = null,
-        // @ts-ignore
         address = null,
-        // @ts-ignore
         isActive = true,
       } = supplierData;
 
       console.log(`Creating supplier: Name ${name}`);
 
-      // Check name uniqueness (business rule)
-      // @ts-ignore
       const existing = await supplierRepo.findOne({ where: { name } });
       if (existing) {
         throw new Error(`Supplier with name "${name}" already exists`);
       }
 
-      // Create supplier entity
-      // @ts-ignore
       const supplier = supplierRepo.create({
         name,
         contactInfo,
@@ -87,22 +88,31 @@ class SupplierService {
         createdAt: new Date(),
       });
 
-      // @ts-ignore
       const savedSupplier = await saveDb(supplierRepo, supplier);
 
-      await auditLogger.logCreate(
-        "Supplier",
-        savedSupplier.id,
-        savedSupplier,
-        user,
-      );
+      if (qr) {
+        const auditRepo = qr.manager.getRepository("AuditLog");
+        await auditRepo.save({
+          action: "CREATE",
+          entity: "Supplier",
+          entityId: savedSupplier.id,
+          user,
+          description: `Created supplier ${savedSupplier.name}`,
+        });
+      } else {
+        await auditLogger.logCreate(
+          "Supplier",
+          savedSupplier.id,
+          savedSupplier,
+          user
+        );
+      }
 
       console.log(
-        `Supplier created: #${savedSupplier.id} - ${savedSupplier.name}`,
+        `Supplier created: #${savedSupplier.id} - ${savedSupplier.name}`
       );
       return savedSupplier;
     } catch (error) {
-      // @ts-ignore
       console.error("Failed to create supplier:", error.message);
       throw error;
     }
@@ -113,13 +123,14 @@ class SupplierService {
    * @param {number} id - Supplier ID
    * @param {Object} supplierData - Updated fields
    * @param {string} user - User performing the action
+   * @param {import("typeorm").QueryRunner | null} qr - Optional transaction query runner
    */
-  async update(id, supplierData, user = "system") {
-    const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
-    const { supplier: supplierRepo } = await this.getRepositories();
+  async update(id, supplierData, user = "system", qr = null) {
+    const { updateDb } = require("../utils/dbUtils/dbActions");
+    const Supplier = require("../entities/Supplier");
+    const supplierRepo = this._getRepo(qr, Supplier);
 
     try {
-      // @ts-ignore
       const existingSupplier = await supplierRepo.findOne({ where: { id } });
       if (!existingSupplier) {
         throw new Error(`Supplier with ID ${id} not found`);
@@ -127,35 +138,44 @@ class SupplierService {
 
       const oldData = { ...existingSupplier };
 
-      // If name is being changed, check uniqueness
-      // @ts-ignore
       if (supplierData.name && supplierData.name !== existingSupplier.name) {
-        // @ts-ignore
         const nameExists = await supplierRepo.findOne({
-          // @ts-ignore
           where: { name: supplierData.name },
         });
         if (nameExists) {
           throw new Error(
-            // @ts-ignore
-            `Supplier with name "${supplierData.name}" already exists`,
+            `Supplier with name "${supplierData.name}" already exists`
           );
         }
       }
 
-      // Update fields
       Object.assign(existingSupplier, supplierData);
       existingSupplier.updatedAt = new Date();
 
-      // @ts-ignore
       const savedSupplier = await updateDb(supplierRepo, existingSupplier);
 
-      await auditLogger.logUpdate("Supplier", id, oldData, savedSupplier, user);
+      if (qr) {
+        const auditRepo = qr.manager.getRepository("AuditLog");
+        await auditRepo.save({
+          action: "UPDATE",
+          entity: "Supplier",
+          entityId: id,
+          user,
+          description: `Updated supplier #${id}`,
+        });
+      } else {
+        await auditLogger.logUpdate(
+          "Supplier",
+          id,
+          oldData,
+          savedSupplier,
+          user
+        );
+      }
 
       console.log(`Supplier updated: #${id}`);
       return savedSupplier;
     } catch (error) {
-      // @ts-ignore
       console.error("Failed to update supplier:", error.message);
       throw error;
     }
@@ -165,13 +185,14 @@ class SupplierService {
    * Soft delete a supplier (set isActive = false)
    * @param {number} id - Supplier ID
    * @param {string} user - User performing the action
+   * @param {import("typeorm").QueryRunner | null} qr - Optional transaction query runner
    */
-  async delete(id, user = "system") {
-    const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
-    const { supplier: supplierRepo } = await this.getRepositories();
+  async delete(id, user = "system", qr = null) {
+    const { updateDb } = require("../utils/dbUtils/dbActions");
+    const Supplier = require("../entities/Supplier");
+    const supplierRepo = this._getRepo(qr, Supplier);
 
     try {
-      // @ts-ignore
       const supplier = await supplierRepo.findOne({ where: { id } });
       if (!supplier) {
         throw new Error(`Supplier with ID ${id} not found`);
@@ -185,38 +206,93 @@ class SupplierService {
       supplier.isActive = false;
       supplier.updatedAt = new Date();
 
-      // @ts-ignore
       const savedSupplier = await updateDb(supplierRepo, supplier);
 
-      await auditLogger.logDelete("Supplier", id, oldData, user);
+      if (qr) {
+        const auditRepo = qr.manager.getRepository("AuditLog");
+        await auditRepo.save({
+          action: "DELETE",
+          entity: "Supplier",
+          entityId: id,
+          user,
+          description: `Deactivated supplier #${id}`,
+        });
+      } else {
+        await auditLogger.logDelete("Supplier", id, oldData, user);
+      }
 
       console.log(`Supplier deactivated: #${id}`);
       return savedSupplier;
     } catch (error) {
-      // @ts-ignore
       console.error("Failed to delete supplier:", error.message);
       throw error;
     }
   }
 
   /**
+   * Hard delete a supplier – removes from DB (only if no products linked)
+   * @param {number} id - Supplier ID
+   * @param {string} user - User performing the action
+   * @param {import("typeorm").QueryRunner | null} qr - Optional transaction query runner
+   */
+  async permanentlyDelete(id, user = "system", qr = null) {
+    const { removeDb } = require("../utils/dbUtils/dbActions");
+    const Supplier = require("../entities/Supplier");
+    const Product = require("../entities/Product");
+
+    const supplierRepo = this._getRepo(qr, Supplier);
+    const productRepo = this._getRepo(qr, Product);
+
+    const supplier = await supplierRepo.findOne({ where: { id } });
+    if (!supplier) {
+      throw new Error(`Supplier with ID ${id} not found`);
+    }
+
+    // Check if any products reference this supplier
+    const productCount = await productRepo.count({
+      where: { supplier: { id } },
+    });
+    if (productCount > 0) {
+      throw new Error(
+        `Cannot delete supplier #${id} because it is used by ${productCount} product(s)`
+      );
+    }
+
+    await removeDb(supplierRepo, supplier);
+
+    if (qr) {
+      const auditRepo = qr.manager.getRepository("AuditLog");
+      await auditRepo.save({
+        action: "DELETE",
+        entity: "Supplier",
+        entityId: id,
+        user,
+        description: `Permanently deleted supplier #${id}`,
+      });
+    } else {
+      await auditLogger.logDelete("Supplier", id, supplier, user);
+    }
+
+    console.log(`Supplier #${id} permanently deleted`);
+  }
+
+  /**
    * Find supplier by ID
    * @param {number} id
+   * @param {import("typeorm").QueryRunner | null} qr - Optional transaction query runner
    */
-  async findById(id) {
-    const { supplier: supplierRepo } = await this.getRepositories();
+  async findById(id, qr = null) {
+    const Supplier = require("../entities/Supplier");
+    const supplierRepo = this._getRepo(qr, Supplier);
 
     try {
-      // @ts-ignore
       const supplier = await supplierRepo.findOne({ where: { id } });
       if (!supplier) {
         throw new Error(`Supplier with ID ${id} not found`);
       }
-      // @ts-ignore
       await auditLogger.logView("Supplier", id, "system");
       return supplier;
     } catch (error) {
-      // @ts-ignore
       console.error("Failed to find supplier:", error.message);
       throw error;
     }
@@ -225,46 +301,34 @@ class SupplierService {
   /**
    * Find all suppliers with optional filters
    * @param {Object} options - Filter options
+   * @param {import("typeorm").QueryRunner | null} qr - Optional transaction query runner
    */
-  async findAll(options = {}) {
-    const { supplier: supplierRepo } = await this.getRepositories();
+  async findAll(options = {}, qr = null) {
+    const Supplier = require("../entities/Supplier");
+    const supplierRepo = this._getRepo(qr, Supplier);
 
     try {
-      // @ts-ignore
       const queryBuilder = supplierRepo.createQueryBuilder("supplier");
 
-      // Filter by active status
-      // @ts-ignore
       if (options.isActive !== undefined) {
         queryBuilder.andWhere("supplier.isActive = :isActive", {
-          // @ts-ignore
           isActive: options.isActive,
         });
       }
 
-      // Search by name, contactInfo, or address
-      // @ts-ignore
       if (options.search) {
         queryBuilder.andWhere(
           "(supplier.name LIKE :search OR supplier.contactInfo LIKE :search OR supplier.address LIKE :search)",
-          // @ts-ignore
-          { search: `%${options.search}%` },
+          { search: `%${options.search}%` }
         );
       }
 
-      // Sorting
-      // @ts-ignore
       const sortBy = options.sortBy || "createdAt";
-      // @ts-ignore
       const sortOrder = options.sortOrder === "ASC" ? "ASC" : "DESC";
       queryBuilder.orderBy(`supplier.${sortBy}`, sortOrder);
 
-      // Pagination
-      // @ts-ignore
       if (options.page && options.limit) {
-        // @ts-ignore
         const offset = (options.page - 1) * options.limit;
-        // @ts-ignore
         queryBuilder.skip(offset).take(options.limit);
       }
 
@@ -280,25 +344,22 @@ class SupplierService {
 
   /**
    * Get supplier statistics
+   * @param {import("typeorm").QueryRunner | null} qr
    */
-  async getStatistics() {
-    const { supplier: supplierRepo, product: productRepo } = await this.getRepositories();
+  async getStatistics(qr = null) {
+    const Supplier = require("../entities/Supplier");
+    const Product = require("../entities/Product");
+    const supplierRepo = this._getRepo(qr, Supplier);
+    const productRepo = this._getRepo(qr, Product);
 
     try {
-      // Total active suppliers
-      // @ts-ignore
       const totalActive = await supplierRepo.count({
         where: { isActive: true },
       });
-
-      // Total inactive suppliers
-      // @ts-ignore
       const totalInactive = await supplierRepo.count({
         where: { isActive: false },
       });
 
-      // Suppliers with product counts
-      // @ts-ignore
       const suppliersWithProductCount = await supplierRepo
         .createQueryBuilder("supplier")
         .leftJoin("supplier.products", "product")
@@ -310,8 +371,6 @@ class SupplierService {
         .orderBy("productCount", "DESC")
         .getRawMany();
 
-      // Total products from active suppliers (optional)
-      // @ts-ignore
       const totalProducts = await productRepo
         .createQueryBuilder("product")
         .leftJoin("product.supplier", "supplier")
@@ -335,10 +394,16 @@ class SupplierService {
    * @param {string} format - 'csv' or 'json'
    * @param {Object} filters - Export filters
    * @param {string} user
+   * @param {import("typeorm").QueryRunner | null} qr
    */
-  async exportSuppliers(format = "json", filters = {}, user = "system") {
+  async exportSuppliers(
+    format = "json",
+    filters = {},
+    user = "system",
+    qr = null
+  ) {
     try {
-      const suppliers = await this.findAll(filters);
+      const suppliers = await this.findAll(filters, qr);
 
       let exportData;
       if (format === "csv") {
@@ -346,6 +411,8 @@ class SupplierService {
           "ID",
           "Name",
           "Contact Info",
+          "Email",
+          "Phone",
           "Address",
           "Active",
           "Created At",
@@ -354,25 +421,29 @@ class SupplierService {
           s.id,
           s.name,
           s.contactInfo || "",
+          s.email || "",
+          s.phone || "",
           s.address || "",
           s.isActive ? "Yes" : "No",
-          // @ts-ignore
           new Date(s.createdAt).toLocaleDateString(),
         ]);
         exportData = {
           format: "csv",
           data: [headers, ...rows].map((row) => row.join(",")).join("\n"),
-          filename: `suppliers_export_${new Date().toISOString().split("T")[0]}.csv`,
+          filename: `suppliers_export_${
+            new Date().toISOString().split("T")[0]
+          }.csv`,
         };
       } else {
         exportData = {
           format: "json",
           data: suppliers,
-          filename: `suppliers_export_${new Date().toISOString().split("T")[0]}.json`,
+          filename: `suppliers_export_${
+            new Date().toISOString().split("T")[0]
+          }.json`,
         };
       }
 
-      // @ts-ignore
       await auditLogger.logExport("Supplier", format, filters, user);
       console.log(`Exported ${suppliers.length} suppliers in ${format} format`);
       return exportData;
@@ -380,6 +451,82 @@ class SupplierService {
       console.error("Failed to export suppliers:", error);
       throw error;
     }
+  }
+
+  /**
+   * Bulk create multiple suppliers
+   * @param {Array<Object>} suppliersArray
+   * @param {string} user
+   * @param {import("typeorm").QueryRunner | null} qr
+   */
+  async bulkCreate(suppliersArray, user = "system", qr = null) {
+    const results = { created: [], errors: [] };
+    for (const supData of suppliersArray) {
+      try {
+        const saved = await this.create(supData, user, qr);
+        results.created.push(saved);
+      } catch (err) {
+        results.errors.push({ supplier: supData, error: err.message });
+      }
+    }
+    return results;
+  }
+
+  /**
+   * Bulk update multiple suppliers
+   * @param {Array<{ id: number, updates: Object }>} updatesArray
+   * @param {string} user
+   * @param {import("typeorm").QueryRunner | null} qr
+   */
+  async bulkUpdate(updatesArray, user = "system", qr = null) {
+    const results = { updated: [], errors: [] };
+    for (const { id, updates } of updatesArray) {
+      try {
+        const saved = await this.update(id, updates, user, qr);
+        results.updated.push(saved);
+      } catch (err) {
+        results.errors.push({ id, updates, error: err.message });
+      }
+    }
+    return results;
+  }
+
+  /**
+   * Import suppliers from a CSV file
+   * @param {string} filePath
+   * @param {string} user
+   * @param {import("typeorm").QueryRunner | null} qr
+   */
+  async importFromCSV(filePath, user = "system", qr = null) {
+    const fs = require("fs").promises;
+    const csv = require("csv-parse/sync");
+    const fileContent = await fs.readFile(filePath, "utf-8");
+    const records = csv.parse(fileContent, {
+      columns: true,
+      skip_empty_lines: true,
+      trim: true,
+    });
+
+    const results = { imported: [], errors: [] };
+    for (const record of records) {
+      try {
+        const supplierData = {
+          name: record.name,
+          contactInfo: record.contactInfo || null,
+          email: record.email || null,
+          phone: record.phone || null,
+          address: record.address || null,
+          isActive: record.isActive !== "false",
+        };
+        const validation = validateSupplierData(supplierData);
+        if (!validation.valid) throw new Error(validation.errors.join(", "));
+        const saved = await this.create(supplierData, user, qr);
+        results.imported.push(saved);
+      } catch (err) {
+        results.errors.push({ row: record, error: err.message });
+      }
+    }
+    return results;
   }
 }
 

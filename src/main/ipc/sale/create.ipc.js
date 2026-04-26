@@ -1,4 +1,5 @@
-//@ts-check
+
+
 const saleService = require("../../../services/Sale");
 
 /**
@@ -19,7 +20,8 @@ module.exports = async (params, queryRunner) => {
     }
 
     console.log("[IPC] sale:create called", params);
-    const result = await saleService.create(params, params.user || "system");
+    const { user = "system", ...saleData } = params;
+    const result = await saleService.create(saleData, user, queryRunner);
     return {
       status: true,
       message: "Sale created successfully",
@@ -29,7 +31,6 @@ module.exports = async (params, queryRunner) => {
     console.error("[IPC] sale:create error:", error);
     return {
       status: false,
-      // @ts-ignore
       message: error.message || "Failed to create sale",
       data: null,
     };

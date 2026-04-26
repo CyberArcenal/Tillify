@@ -1,4 +1,4 @@
-//@ts-check
+
 const { AppDataSource } = require("../../../db/datasource");
 const Customer = require("../../../../entities/Customer");
 const Sale = require("../../../../entities/Sale");

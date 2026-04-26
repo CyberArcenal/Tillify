@@ -1,5 +1,5 @@
 // src/main/ipc/product/get/active.ipc
-//@ts-check
+
 
 const productService = require("../../../../services/Product");
 

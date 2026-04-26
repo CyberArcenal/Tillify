@@ -1,6 +1,4 @@
 // services/CategoryService.js
-// @ts-check
-
 const auditLogger = require("../utils/auditLogger");
 const { validateCategoryData } = require("../utils/categoryUtils");
 
@@ -34,46 +32,51 @@ class CategoryService {
   }
 
   /**
+   * Helper: get a repository (transactional if queryRunner provided)
+   * @param {import("typeorm").QueryRunner | null} qr
+   * @param {Function} entityClass
+   * @returns {import("typeorm").Repository<any>}
+   */
+  _getRepo(qr, entityClass) {
+    if (qr) {
+      return qr.manager.getRepository(entityClass);
+    }
+    const { AppDataSource } = require("../main/db/datasource");
+    return AppDataSource.getRepository(entityClass);
+  }
+
+  /**
    * Create a new category
    * @param {Object} categoryData - Category data
    * @param {string} user - User performing the action
+   * @param {import("typeorm").QueryRunner | null} qr - Optional transaction query runner
    */
-  async create(categoryData, user = "system") {
-    // @ts-ignore
-    const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
-    const { category: categoryRepo } = await this.getRepositories();
+  async create(categoryData, user = "system", qr = null) {
+    const { saveDb } = require("../utils/dbUtils/dbActions");
+    const Category = require("../entities/Category");
+
+    const categoryRepo = this._getRepo(qr, Category);
 
     try {
-      // Validate category data
       const validation = validateCategoryData(categoryData);
       if (!validation.valid) {
         throw new Error(validation.errors.join(", "));
       }
 
       const {
-        // @ts-ignore
         name,
-
-        // @ts-ignore
         description = null,
-
-        // @ts-ignore
         isActive = true,
       } = categoryData;
 
       console.log(`Creating category: Name ${name}`);
 
       // Check name uniqueness
-
-      // @ts-ignore
       const existing = await categoryRepo.findOne({ where: { name } });
       if (existing) {
         throw new Error(`Category with name "${name}" already exists`);
       }
 
-      // Create category entity
-
-      // @ts-ignore
       const category = categoryRepo.create({
         name,
         description,
@@ -81,22 +84,20 @@ class CategoryService {
         createdAt: new Date(),
       });
 
-      // @ts-ignore
       const savedCategory = await saveDb(categoryRepo, category);
 
       await auditLogger.logCreate(
         "Category",
         savedCategory.id,
         savedCategory,
-        user,
+        user
       );
 
       console.log(
-        `Category created: #${savedCategory.id} - ${savedCategory.name}`,
+        `Category created: #${savedCategory.id} - ${savedCategory.name}`
       );
       return savedCategory;
     } catch (error) {
-      // @ts-ignore
       console.error("Failed to create category:", error.message);
       throw error;
     }
@@ -107,14 +108,15 @@ class CategoryService {
    * @param {number} id - Category ID
    * @param {Object} categoryData - Updated fields
    * @param {string} user - User performing the action
+   * @param {import("typeorm").QueryRunner | null} qr - Optional transaction query runner
    */
-  async update(id, categoryData, user = "system") {
-    // @ts-ignore
-    const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
-    const { category: categoryRepo } = await this.getRepositories();
+  async update(id, categoryData, user = "system", qr = null) {
+    const { updateDb } = require("../utils/dbUtils/dbActions");
+    const Category = require("../entities/Category");
+
+    const categoryRepo = this._getRepo(qr, Category);
 
     try {
-      // @ts-ignore
       const existingCategory = await categoryRepo.findOne({ where: { id } });
       if (!existingCategory) {
         throw new Error(`Category with ID ${id} not found`);
@@ -122,28 +124,20 @@ class CategoryService {
 
       const oldData = { ...existingCategory };
 
-      // If name is being changed, check uniqueness
-
-      // @ts-ignore
       if (categoryData.name && categoryData.name !== existingCategory.name) {
-        // @ts-ignore
         const nameExists = await categoryRepo.findOne({
-          // @ts-ignore
           where: { name: categoryData.name },
         });
         if (nameExists) {
           throw new Error(
-            // @ts-ignore
-            `Category with name "${categoryData.name}" already exists`,
+            `Category with name "${categoryData.name}" already exists`
           );
         }
       }
 
-      // Update fields
       Object.assign(existingCategory, categoryData);
       existingCategory.updatedAt = new Date();
 
-      // @ts-ignore
       const savedCategory = await updateDb(categoryRepo, existingCategory);
 
       await auditLogger.logUpdate("Category", id, oldData, savedCategory, user);
@@ -151,7 +145,6 @@ class CategoryService {
       console.log(`Category updated: #${id}`);
       return savedCategory;
     } catch (error) {
-      // @ts-ignore
       console.error("Failed to update category:", error.message);
       throw error;
     }
@@ -161,14 +154,15 @@ class CategoryService {
    * Soft delete a category (set isActive = false)
    * @param {number} id - Category ID
    * @param {string} user - User performing the action
+   * @param {import("typeorm").QueryRunner | null} qr - Optional transaction query runner
    */
-  async delete(id, user = "system") {
-    // @ts-ignore
-    const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");
-    const { category: categoryRepo } = await this.getRepositories();
+  async delete(id, user = "system", qr = null) {
+    const { updateDb } = require("../utils/dbUtils/dbActions");
+    const Category = require("../entities/Category");
+
+    const categoryRepo = this._getRepo(qr, Category);
 
     try {
-      // @ts-ignore
       const category = await categoryRepo.findOne({ where: { id } });
       if (!category) {
         throw new Error(`Category with ID ${id} not found`);
@@ -182,7 +176,6 @@ class CategoryService {
       category.isActive = false;
       category.updatedAt = new Date();
 
-      // @ts-ignore
       const savedCategory = await updateDb(categoryRepo, category);
 
       await auditLogger.logDelete("Category", id, oldData, user);
@@ -190,31 +183,63 @@ class CategoryService {
       console.log(`Category deactivated: #${id}`);
       return savedCategory;
     } catch (error) {
-      // @ts-ignore
       console.error("Failed to delete category:", error.message);
       throw error;
     }
   }
 
   /**
+   * Hard delete a category – removes from DB (only if no products linked)
+   * @param {number} id - Category ID
+   * @param {string} user - User performing the action
+   * @param {import("typeorm").QueryRunner | null} qr - Optional transaction query runner
+   */
+  async permanentlyDelete(id, user = "system", qr = null) {
+    const { removeDb } = require("../utils/dbUtils/dbActions");
+    const Category = require("../entities/Category");
+    const Product = require("../entities/Product");
+
+    const categoryRepo = this._getRepo(qr, Category);
+    const productRepo = this._getRepo(qr, Product);
+
+    const category = await categoryRepo.findOne({ where: { id } });
+    if (!category) {
+      throw new Error(`Category with ID ${id} not found`);
+    }
+
+    // Check if any products reference this category
+    const productCount = await productRepo.count({
+      where: { category: { id } },
+    });
+    if (productCount > 0) {
+      throw new Error(
+        `Cannot delete category #${id} because it is used by ${productCount} product(s)`
+      );
+    }
+
+    await removeDb(categoryRepo, category);
+    await auditLogger.logDelete("Category", id, category, user);
+    console.log(`Category #${id} permanently deleted`);
+  }
+
+  /**
    * Find category by ID
    * @param {number} id
+   * @param {import("typeorm").QueryRunner | null} qr - Optional transaction query runner
    */
-  async findById(id) {
-    const { category: categoryRepo } = await this.getRepositories();
+  async findById(id, qr = null) {
+    const Category = require("../entities/Category");
+    const categoryRepo = this._getRepo(qr, Category);
 
     try {
-      // @ts-ignore
       const category = await categoryRepo.findOne({ where: { id } });
       if (!category) {
         throw new Error(`Category with ID ${id} not found`);
       }
 
-      // @ts-ignore
       await auditLogger.logView("Category", id, "system");
       return category;
     } catch (error) {
-      // @ts-ignore
       console.error("Failed to find category:", error.message);
       throw error;
     }
@@ -223,51 +248,33 @@ class CategoryService {
   /**
    * Find all categories with optional filters
    * @param {Object} options - Filter options
+   * @param {import("typeorm").QueryRunner | null} qr - Optional transaction query runner
    */
-  async findAll(options = {}) {
-    const { category: categoryRepo } = await this.getRepositories();
+  async findAll(options = {}, qr = null) {
+    const Category = require("../entities/Category");
+    const categoryRepo = this._getRepo(qr, Category);
 
     try {
-      // @ts-ignore
       const queryBuilder = categoryRepo.createQueryBuilder("category");
 
-      // Filter by active status
-
-      // @ts-ignore
       if (options.isActive !== undefined) {
         queryBuilder.andWhere("category.isActive = :isActive", {
-          // @ts-ignore
           isActive: options.isActive,
         });
       }
 
-      // Search by name
-
-      // @ts-ignore
       if (options.search) {
         queryBuilder.andWhere("category.name LIKE :search", {
-          // @ts-ignore
           search: `%${options.search}%`,
         });
       }
 
-      // Sorting
-
-      // @ts-ignore
       const sortBy = options.sortBy || "createdAt";
-
-      // @ts-ignore
       const sortOrder = options.sortOrder === "ASC" ? "ASC" : "DESC";
       queryBuilder.orderBy(`category.${sortBy}`, sortOrder);
 
-      // Pagination
-
-      // @ts-ignore
       if (options.page && options.limit) {
-        // @ts-ignore
         const offset = (options.page - 1) * options.limit;
-
-        // @ts-ignore
         queryBuilder.skip(offset).take(options.limit);
       }
 
@@ -283,30 +290,23 @@ class CategoryService {
 
   /**
    * Get category statistics
+   * @param {import("typeorm").QueryRunner | null} qr - Optional transaction query runner
    */
-  async getStatistics() {
-    // @ts-ignore
-    const { category: categoryRepo, product: productRepo } =
-      await this.getRepositories();
+  async getStatistics(qr = null) {
+    const Category = require("../entities/Category");
+    const Product = require("../entities/Product");
+    const categoryRepo = this._getRepo(qr, Category);
+    const productRepo = this._getRepo(qr, Product);
 
     try {
-      // Total active categories
-
-      // @ts-ignore
       const totalActive = await categoryRepo.count({
         where: { isActive: true },
       });
 
-      // Total inactive categories
-
-      // @ts-ignore
       const totalInactive = await categoryRepo.count({
         where: { isActive: false },
       });
 
-      // Categories with product counts
-
-      // @ts-ignore
       const categoriesWithProductCount = await categoryRepo
         .createQueryBuilder("category")
         .leftJoin("category.products", "product")
@@ -334,10 +334,11 @@ class CategoryService {
    * @param {string} format - 'csv' or 'json'
    * @param {Object} filters - Export filters
    * @param {string} user
+   * @param {import("typeorm").QueryRunner | null} qr - Optional transaction query runner
    */
-  async exportCategories(format = "json", filters = {}, user = "system") {
+  async exportCategories(format = "json", filters = {}, user = "system", qr = null) {
     try {
-      const categories = await this.findAll(filters);
+      const categories = await this.findAll(filters, qr);
 
       let exportData;
       if (format === "csv") {
@@ -347,8 +348,6 @@ class CategoryService {
           c.name,
           c.description || "",
           c.isActive ? "Yes" : "No",
-
-          // @ts-ignore
           new Date(c.createdAt).toLocaleDateString(),
         ]);
         exportData = {
@@ -364,16 +363,88 @@ class CategoryService {
         };
       }
 
-      // @ts-ignore
       await auditLogger.logExport("Category", format, filters, user);
       console.log(
-        `Exported ${categories.length} categories in ${format} format`,
+        `Exported ${categories.length} categories in ${format} format`
       );
       return exportData;
     } catch (error) {
       console.error("Failed to export categories:", error);
       throw error;
     }
+  }
+
+  /**
+   * Bulk create multiple categories
+   * @param {Array<Object>} categoriesArray
+   * @param {string} user
+   * @param {import("typeorm").QueryRunner | null} qr
+   */
+  async bulkCreate(categoriesArray, user = "system", qr = null) {
+    const results = { created: [], errors: [] };
+    for (const catData of categoriesArray) {
+      try {
+        const saved = await this.create(catData, user, qr);
+        results.created.push(saved);
+      } catch (err) {
+        results.errors.push({ category: catData, error: err.message });
+      }
+    }
+    return results;
+  }
+
+  /**
+   * Bulk update multiple categories
+   * @param {Array<{ id: number, updates: Object }>} updatesArray
+   * @param {string} user
+   * @param {import("typeorm").QueryRunner | null} qr
+   */
+  async bulkUpdate(updatesArray, user = "system", qr = null) {
+    const results = { updated: [], errors: [] };
+    for (const { id, updates } of updatesArray) {
+      try {
+        const saved = await this.update(id, updates, user, qr);
+        results.updated.push(saved);
+      } catch (err) {
+        results.errors.push({ id, updates, error: err.message });
+      }
+    }
+    return results;
+  }
+
+  /**
+   * Import categories from a CSV file
+   * @param {string} filePath
+   * @param {string} user
+   * @param {import("typeorm").QueryRunner | null} qr
+   */
+  async importFromCSV(filePath, user = "system", qr = null) {
+    const fs = require("fs").promises;
+    const csv = require("csv-parse/sync");
+    const fileContent = await fs.readFile(filePath, "utf-8");
+    const records = csv.parse(fileContent, {
+      columns: true,
+      skip_empty_lines: true,
+      trim: true,
+    });
+
+    const results = { imported: [], errors: [] };
+    for (const record of records) {
+      try {
+        const categoryData = {
+          name: record.name,
+          description: record.description || null,
+          isActive: record.isActive !== "false",
+        };
+        const validation = validateCategoryData(categoryData);
+        if (!validation.valid) throw new Error(validation.errors.join(", "));
+        const saved = await this.create(categoryData, user, qr);
+        results.imported.push(saved);
+      } catch (err) {
+        results.errors.push({ row: record, error: err.message });
+      }
+    }
+    return results;
   }
 }
 

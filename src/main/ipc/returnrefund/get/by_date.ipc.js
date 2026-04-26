@@ -1,4 +1,4 @@
-// @ts-check
+
 const returnRefundService = require("../../../../services/ReturnRefundService");
 
 /**
@@ -6,7 +6,7 @@ const returnRefundService = require("../../../../services/ReturnRefundService");
  * @param {Object} params - Request parameters.
  * @param {string} params.startDate - ISO date string (e.g., '2025-01-01').
  * @param {string} [params.endDate] - ISO date string (defaults to now).
- * @param {import('typeorm').QueryRunner} [queryRunner] - Optional transaction runner.
+ * @param {import('typeorm').QueryRunner} queryRunner - Transaction runner (optional for reads).
  * @returns {Promise<{status: boolean, message: string, data: any}>}
  */
 module.exports = async (params, queryRunner) => {
@@ -17,11 +17,11 @@ module.exports = async (params, queryRunner) => {
     }
 
     const filters = {
-      startDate: new Date(startDate),
-      ...(endDate && { endDate: new Date(endDate) }),
+      startDate,
+      ...(endDate && { endDate }),
     };
 
-    const returns = await returnRefundService.findAll(filters);
+    const returns = await returnRefundService.findAll(filters, queryRunner);
     return {
       status: true,
       message: "Returns by date fetched successfully",

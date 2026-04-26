@@ -1,6 +1,5 @@
-// @ts-check
-const { AuditLog } = require("../../../entities/AuditLog");
-const { validateCategoryData } = require("../../../utils/categoryUtils");
+
+const categoryService = require("../../../services/CategoryService");
 
 /**
  * Update an existing category (transactional)
@@ -24,22 +23,14 @@ module.exports = async (params, queryRunner) => {
       throw new Error("Invalid or missing category ID");
     }
 
-    const categoryRepo = queryRunner.manager.getRepository("Category");
-
-    // Find existing
-    const existing = await categoryRepo.findOne({ where: { id: Number(id) } });
-    if (!existing) {
-      throw new Error(`Category with ID ${id} not found`);
-    }
-
-    // Prepare update data
+    // Build update object (only provided fields)
     const updateData = {};
     if (name !== undefined) updateData.name = name;
     if (description !== undefined) updateData.description = description;
     if (isActive !== undefined) updateData.isActive = isActive;
 
-    // Validate if anything changed
     if (Object.keys(updateData).length === 0) {
+      const existing = await categoryService.findById(Number(id), queryRunner);
       return {
         status: true,
         message: "No changes provided",
@@ -47,37 +38,12 @@ module.exports = async (params, queryRunner) => {
       };
     }
 
-    // If name is changing, validate and check uniqueness
-    if (updateData.name && updateData.name !== existing.name) {
-      const validation = validateCategoryData({ name: updateData.name });
-      if (!validation.valid) {
-        throw new Error(validation.errors.join(", "));
-      }
-      const nameExists = await categoryRepo.findOne({
-        where: { name: updateData.name },
-      });
-      if (nameExists) {
-        throw new Error(`Category with name "${updateData.name}" already exists`);
-      }
-    }
-
-    // Apply updates
-    Object.assign(existing, updateData);
-    existing.updatedAt = new Date();
-
-    const savedCategory = await categoryRepo.save(existing);
-
-    // Audit log
-    const auditRepo = queryRunner.manager.getRepository(AuditLog);
-    const audit = auditRepo.create({
-      action: "UPDATE",
-      entity: "Category",
-      entityId: savedCategory.id,
+    const savedCategory = await categoryService.update(
+      Number(id),
+      updateData,
       user,
-      timestamp: new Date(),
-      description: `Category updated: ${savedCategory.name}`,
-    });
-    await auditRepo.save(audit);
+      queryRunner
+    );
 
     return {
       status: true,

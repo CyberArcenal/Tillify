@@ -1,5 +1,5 @@
 // src/main/ipc/purchase/create.ipc.js
-// @ts-check
+
 
 const purchaseService = require('../../../services/PurchaseService');
 
@@ -22,7 +22,7 @@ module.exports = async (params, queryRunner) => {
       };
     }
 
-    const newPurchase = await purchaseService.create(purchaseData, user);
+    const newPurchase = await purchaseService.create(purchaseData, user, queryRunner);
     return {
       status: true,
       message: "Purchase created successfully",

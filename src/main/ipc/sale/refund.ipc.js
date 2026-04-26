@@ -1,4 +1,4 @@
-//@ts-check
+
 const saleService = require("../../../services/Sale");
 
 /**
@@ -17,7 +17,7 @@ module.exports = async (params, queryRunner) => {
     if (!reason) return { status: false, message: "reason is required", data: null };
 
     console.log("[IPC] sale:refund called", { id, items, reason });
-    const result = await saleService.refundSale(id, items, reason, user || "system");
+    const result = await saleService.refundSale(id, items, reason, user || "system", queryRunner);
     return {
       status: true,
       message: "Refund processed successfully",

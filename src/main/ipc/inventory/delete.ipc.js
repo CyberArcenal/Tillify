@@ -1,5 +1,5 @@
 // src/main/ipc/inventory/delete.ipc.js
-//@ts-check
+
 const { AppDataSource } = require("../../db/datasource");
 const InventoryMovement = require("../../../entities/InventoryMovement");
 const Product = require("../../../entities/Product");

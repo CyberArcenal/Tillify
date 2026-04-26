@@ -1,5 +1,5 @@
 // utils/purchaseUtils.js
-// @ts-check
+
 
 /**
  * Validate purchase data

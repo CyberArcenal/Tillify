@@ -1,5 +1,5 @@
 // services/SaleService.js
-//@ts-check
+
 
 const auditLogger = require("../utils/auditLogger");
 const { saveDb, updateDb } = require("../utils/dbUtils/dbActions");

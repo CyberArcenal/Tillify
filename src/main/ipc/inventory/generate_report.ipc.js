@@ -1,29 +1,25 @@
 // src/main/ipc/inventory/generate_report.ipc.js
-//@ts-check
-const { AppDataSource } = require("../../db/datasource");
-const InventoryMovement = require("../../../entities/InventoryMovement");
-const Product = require("../../../entities/Product");
+
+
+const inventoryMovementService = require("../../../services/InventoryMovement");
+const productService = require("../../../services/Product");
+
 
 /**
  * Generate a comprehensive inventory report with summary and movements.
  * @param {Object} params
  * @param {string} [params.startDate] - ISO date.
  * @param {string} [params.endDate] - ISO date.
+ * @param {string} [params.user="system"]
  * @param {import("typeorm").QueryRunner} [queryRunner]
  * @returns {Promise<{status: boolean, message: string, data: any}>}
  */
 module.exports = async (params, queryRunner) => {
   try {
-    const { startDate, endDate } = params;
-    const movementRepo = queryRunner
-      ? queryRunner.manager.getRepository(InventoryMovement)
-      : AppDataSource.getRepository(InventoryMovement);
-    const productRepo = queryRunner
-      ? queryRunner.manager.getRepository(Product)
-      : AppDataSource.getRepository(Product);
+    const { startDate, endDate, user = "system" } = params;
 
-    // Product summary
-    const products = await productRepo.find({ where: { isActive: true } });
+    // Product summary using ProductService (read-only, no transaction needed)
+    const products = await productService.findAll({ isActive: true });
     const productSummary = products.map((p) => ({
       id: p.id,
       name: p.name,
@@ -32,20 +28,11 @@ module.exports = async (params, queryRunner) => {
       price: p.price,
     }));
 
-    // Movement summary within date range
-    const queryBuilder = movementRepo
-      .createQueryBuilder("movement")
-      .leftJoinAndSelect("movement.product", "product")
-      .leftJoinAndSelect("movement.sale", "sale");
-
-    if (startDate) {
-      queryBuilder.andWhere("movement.timestamp >= :startDate", { startDate });
-    }
-    if (endDate) {
-      queryBuilder.andWhere("movement.timestamp <= :endDate", { endDate });
-    }
-
-    const movements = await queryBuilder.getMany();
+    // Movement summary within date range using InventoryMovementService
+    const movements = await inventoryMovementService.findAll(
+      { startDate, endDate },
+      queryRunner
+    );
 
     // Group by type
     const byType = movements.reduce((acc, m) => {
@@ -78,7 +65,7 @@ module.exports = async (params, queryRunner) => {
         byType,
       },
       topProducts,
-      recentMovements: movements.slice(0, 50), // limit for performance
+      recentMovements: movements.slice(0, 50),
     };
 
     return {
