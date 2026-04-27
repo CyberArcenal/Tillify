@@ -5,7 +5,7 @@ import React, {
   useCallback,
   useState,
 } from "react";
-import { ShoppingCart } from "lucide-react";
+import { ShoppingCart, Trash2 } from "lucide-react";
 import Decimal from "decimal.js";
 import type {
   CartItem as CartItemType,
@@ -29,6 +29,7 @@ import {
   useMaxDiscountPercent,
 } from "../../../utils/posUtils";
 import { useDebounce } from "../hooks/useDebounce";
+import { dialogs } from "../../../utils/dialogs";
 
 interface CartProps {
   cart: CartItemType[];
@@ -53,6 +54,7 @@ interface CartProps {
   onPaymentMethodChange: (method: PaymentMethod) => void;
   isProcessing: boolean;
   onCheckout: () => void;
+  onClearCart: () => void;
 }
 
 const Cart: React.FC<CartProps> = ({
@@ -78,6 +80,7 @@ const Cart: React.FC<CartProps> = ({
   onPaymentMethodChange,
   isProcessing,
   onCheckout,
+  onClearCart,
 }) => {
   const cartContainerRef = useRef<HTMLDivElement | null>(null);
   const discountEnabled = useDiscountEnabled();
@@ -119,6 +122,16 @@ const Cart: React.FC<CartProps> = ({
     [loyaltyPointsAvailable, cart, globalDiscount, globalTax]
   );
 
+  const handleClearCart = async () => {
+    const confirmed = await dialogs.confirm({
+      title: "Clear Cart",
+      message: "Are you sure you want to remove all items from the cart?",
+    });
+    if (confirmed) {
+      onClearCart();
+    }
+  };
+
   // Auto-scroll to bottom when cart changes
   useEffect(() => {
     if (cartContainerRef.current) {
@@ -139,11 +152,19 @@ const Cart: React.FC<CartProps> = ({
 
   return (
     <div className="flex flex-col h-full bg-[var(--cart-bg)] border-l border-[var(--border-color)]">
-      <div className="p-4 border-b border-[var(--border-color)]">
+      <div className="p-4 border-b border-[var(--border-color)] flex justify-between items-center">
         <h2 className="text-lg font-semibold text-[var(--text-primary)] flex items-center gap-2">
           <ShoppingCart className="w-5 h-5" />
           Current Sale
         </h2>
+        <button
+          onClick={handleClearCart}
+          disabled={cart.length === 0}
+          className="p-1.5 rounded-md text-[var(--text-tertiary)] hover:bg-[var(--card-hover-bg)] hover:text-[var(--accent-red)] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          title="Clear cart"
+        >
+          <Trash2 className="w-5 h-5" />
+        </button>
       </div>
 
       <div

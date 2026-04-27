@@ -160,6 +160,14 @@ const Cashier: React.FC = () => {
   // Use optimized barcode scanner hook
   useBarcodeScanner(handleBarcodeScanned, isBarcodeEnabled);
 
+  const handleClearCart = useCallback(() => {
+  clearCart();
+  // Reset loyalty redemption when cart is cleared
+  setUseLoyalty(false);
+  setLoyaltyPointsToRedeem(0);
+}, [clearCart, setUseLoyalty, setLoyaltyPointsToRedeem]);
+
+
   // Keyboard shortcuts (unchanged, but keep as is)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -271,6 +279,7 @@ const Cashier: React.FC = () => {
             onPaymentMethodChange={setPaymentMethod}
             isProcessing={isProcessing}
             onCheckout={handleCheckoutClick}
+            onClearCart={handleClearCart}
           />
         </div>
       </div>

@@ -1,3 +1,4 @@
+// src/renderer/pages/Transactions/index.tsx
 import React, { useState } from "react";
 import { PlusCircle, Download, Loader2, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
@@ -14,21 +15,28 @@ import { FilterBar } from "./components/FilterBar";
 import { SummaryMetrics } from "./components/SummaryMetrics";
 import { TransactionsTable } from "./components/TransactionsTable";
 import { TransactionDetailsDrawer } from "./components/TransactionDetailsDrawer";
-import { PromptDialog } from "../../components/Shared/PromptDialog"; // <-- new import
+import { PromptDialog } from "../../components/Shared/PromptDialog";
 import { dialogs } from "../../utils/dialogs";
 import saleAPI, { type Sale } from "../../api/core/sale";
 import Pagination from "../../components/Shared/Pagination1";
 import { hideLoading, showLoading } from "../../utils/notification";
 
 const TransactionsPage: React.FC = () => {
-  const { transactions, filters, setFilters, loading, error, reload } =
-    useTransactions({
-      startDate: format(new Date(), "yyyy-MM-dd"),
-      endDate: format(new Date(), "yyyy-MM-dd"),
-      search: "",
-      paymentMethod: "",
-      status: "",
-    });
+  const { 
+    transactions,       // filtered (for table)
+    allTransactions,   // unfiltered (for stats)
+    filters, 
+    setFilters, 
+    loading, 
+    error, 
+    reload 
+  } = useTransactions({
+    startDate: format(new Date(), "yyyy-MM-dd"),
+    endDate: format(new Date(), "yyyy-MM-dd"),
+    search: "",
+    paymentMethod: "",
+    status: "",
+  });
 
   const { selectedTransaction, detailsOpen, openDetails, closeDetails } =
     useTransactionDetails();
@@ -129,13 +137,12 @@ const TransactionsPage: React.FC = () => {
     }
   };
 
-  // Pagination calculations
+  // Pagination calculations – using filtered transactions (table data)
   const paginatedTransactions = transactions.slice(
     (currentPage - 1) * pageSize,
     currentPage * pageSize,
   );
   const totalItems = transactions.length;
-  const totalPages = Math.ceil(totalItems / pageSize);
 
   const handlePageChange = (page: number) => setCurrentPage(page);
   const handlePageSizeChange = (newSize: number) => {
@@ -153,7 +160,7 @@ const TransactionsPage: React.FC = () => {
         <div className="flex gap-2">
           <button
             onClick={handleNewSale}
-            className="flex items-center gap-2 px-4 py-2 bg-[var(--accent-blue)] text-white rounded-lg hover:bg-[var(--accent-blue-hover)] transition-colors hidden"
+            className="hidden items-center gap-2 px-4 py-2 bg-[var(--accent-blue)] text-white rounded-lg hover:bg-[var(--accent-blue-hover)] transition-colors"
           >
             <PlusCircle className="w-4 h-4" />
             New Sale
@@ -168,8 +175,8 @@ const TransactionsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Summary Metrics */}
-      <SummaryMetrics transactions={transactions} />
+      {/* Summary Metrics – uses allTransactions (unfiltered) */}
+      <SummaryMetrics transactions={allTransactions} />
 
       {/* Filters */}
       <FilterBar

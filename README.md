@@ -21,13 +21,12 @@ With **offline-first design**, **customer loyalty**, **vouchers**, and **auto-up
 - Works seamlessly with **mouse + keyboard** or **touch input**  
 - Designed to be **hardware-optional** — fully functional even without barcode scanners or receipt printers
 
-## 📸 Screenshots
+## 📸 Gallery
 
-Here are sample displays of the system
-
-![Screenshot 1](https://github.com/CyberArcenal/Tillify/blob/main/screenshots/1.png?raw=true)
-![Screenshot 2](https://github.com/CyberArcenal/Tillify/blob/main/screenshots/2.png?raw=true)
-![Screenshot 3](https://github.com/CyberArcenal/Tillify/blob/main/screenshots/3.png?raw=true)
+![Thumbnail 1](https://github.com/CyberArcenal/Tillify/blob/main/screenshots/thumbnail1.png?raw=true)
+![Thumbnail 2](https://github.com/CyberArcenal/Tillify/blob/main/screenshots/thumbnail2.png?raw=true)
+![Thumbnail 3](https://github.com/CyberArcenal/Tillify/blob/main/screenshots/thumbnail3.png?raw=true)
+![Thumbnail 4](https://github.com/CyberArcenal/Tillify/blob/main/screenshots/thumbnail4.png?raw=true)
 
 ## 🚀 Features
 

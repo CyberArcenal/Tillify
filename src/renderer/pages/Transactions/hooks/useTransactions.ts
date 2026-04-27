@@ -1,3 +1,4 @@
+// src/renderer/pages/Transactions/hooks/useTransactions.ts
 import { useState, useEffect, useCallback } from "react";
 import saleAPI, { type Sale } from "../../../api/core/sale";
 import { dialogs } from "../../../utils/dialogs";
@@ -14,12 +15,15 @@ export interface TransactionFilters {
 }
 
 export function useTransactions(initialFilters: TransactionFilters) {
-  const [transactions, setTransactions] = useState<Sale[]>([]);
+  // All transactions fetched from API (only filtered by date range)
+  const [allTransactions, setAllTransactions] = useState<Sale[]>([]);
+  // Filtered version for the table (applies search, paymentMethod, status)
   const [filteredTransactions, setFilteredTransactions] = useState<Sale[]>([]);
   const [filters, setFilters] = useState<TransactionFilters>(initialFilters);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Fetch data when date range changes (or on manual reload)
   const loadTransactions = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -27,14 +31,12 @@ export function useTransactions(initialFilters: TransactionFilters) {
       const response = await saleAPI.getAll({
         startDate: filters.startDate || undefined,
         endDate: filters.endDate || undefined,
-        paymentMethod: filters.paymentMethod || undefined,
-        status: filters.status || undefined,
-        search: filters.search || undefined,
+        // Do NOT send search, paymentMethod, status – we filter locally
         sortBy: "timestamp",
         sortOrder: "DESC",
       });
       if (response.status) {
-        setTransactions(response.data);
+        setAllTransactions(response.data);
       } else {
         throw new Error(response.message);
       }
@@ -44,19 +46,52 @@ export function useTransactions(initialFilters: TransactionFilters) {
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [filters.startDate, filters.endDate]);
 
-  // Apply local filters (if any) – currently we rely on backend filtering
+  // Apply local filters (search, paymentMethod, status) whenever allTransactions or filters change
   useEffect(() => {
-    setFilteredTransactions(transactions);
-  }, [transactions]);
+    let filtered = [...allTransactions];
 
+    // Search by transaction ID, customer name, or product SKU/name
+    if (filters.search) {
+      const searchLower = filters.search.toLowerCase();
+      filtered = filtered.filter((tx) => {
+        // match by ID
+        if (tx.id.toString().includes(searchLower)) return true;
+        // match by customer name
+        if (tx.customer?.name?.toLowerCase().includes(searchLower)) return true;
+        // match by any product SKU or name in sale items
+        return tx.saleItems.some(
+          (item) =>
+            item.product.sku.toLowerCase().includes(searchLower) ||
+            item.product.name.toLowerCase().includes(searchLower)
+        );
+      });
+    }
+
+    // Payment method filter
+    if (filters.paymentMethod) {
+      filtered = filtered.filter(
+        (tx) => tx.paymentMethod === filters.paymentMethod
+      );
+    }
+
+    // Status filter
+    if (filters.status) {
+      filtered = filtered.filter((tx) => tx.status === filters.status);
+    }
+
+    setFilteredTransactions(filtered);
+  }, [allTransactions, filters.search, filters.paymentMethod, filters.status]);
+
+  // Reload when date range changes
   useEffect(() => {
     loadTransactions();
   }, [loadTransactions]);
 
   return {
-    transactions: filteredTransactions,
+    transactions: filteredTransactions,   // for the table
+    allTransactions,                      // for stats (unfiltered)
     filters,
     setFilters,
     loading,
