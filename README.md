@@ -5,7 +5,7 @@
   <br />
   Tillify POS
   <br />
-  <img src="https://img.shields.io/badge/version-1.0.10-blue" />
+  <img src="https://img.shields.io/badge/version-1.0.11-blue" />
   <img src="https://img.shields.io/badge/license-Apache%202.0-green" />
 </h1>
 
